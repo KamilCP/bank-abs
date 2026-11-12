@@ -61,7 +61,7 @@ else
                                 @foreach (var credit in _dueCredits)
                                 {
                                     <tr>
-                                        <td class="text-nowrap"><a href="credits/@credit.Id">@credit.ClientName</a></td>
+                                        <td><a href="credits/@credit.Id">@credit.ClientName</a></td>
                                         <td class="@(credit.NextDueDate < Fmt.Today ? "text-danger fw-semibold" : "")">@Fmt.Date(credit.NextDueDate)</td>
                                         <td class="num">@Fmt.Money(credit.MonthlyPayment)</td>
                                         <td><StatusBadge Kind="credit" Value="@credit.Status" /></td>

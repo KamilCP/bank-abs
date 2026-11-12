@@ -10,7 +10,7 @@
 <div class="panel">
     <div class="panel-title"><i class="bi bi-piggy-bank"></i>Депозитні продукти</div>
     <div class="table-wrap">
-        <table class="table table-sm align-middle">
+        <table class="table table-sm align-middle product-table">
             <thead><tr><th>Назва</th><th>Валюта</th><th class="num">Ставка, %</th><th class="num">Строк, міс.</th><th class="num">Мін. сума</th><th>Капіталізація</th><th>Дострокове розірвання</th><th>Доступний</th><th></th></tr></thead>
             <tbody>
                 @foreach (var product in _deposits.Append(new DepositProduct { Name = string.Empty }))
@@ -37,7 +37,7 @@
 <div class="panel">
     <div class="panel-title"><i class="bi bi-credit-card-2-front"></i>Кредитні продукти</div>
     <div class="table-wrap">
-        <table class="table table-sm align-middle">
+        <table class="table table-sm align-middle product-table">
             <thead><tr><th>Назва</th><th>Валюта</th><th class="num">Ставка, %</th><th class="num">Строк від</th><th class="num">Строк до</th><th class="num">Сума від</th><th class="num">Сума до</th><th>Доступний</th><th></th></tr></thead>
             <tbody>
                 @foreach (var product in _credits.Append(new CreditProduct { Name = string.Empty }))

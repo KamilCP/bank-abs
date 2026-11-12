@@ -144,4 +144,7 @@ body { background: var(--app-bg); font-variant-numeric: tabular-nums; }
 
 /* Таблиці з редагуванням у рядку (довідник продуктів) */
 .currency-select { min-width: 5.5rem; }
-.product-name { min-width: 11rem; }
+.product-name { min-width: 9rem; }
+.table.product-table thead th { white-space: normal; vertical-align: bottom; }
+.product-table input[type=number] { min-width: 4.5rem; }
+.product-table input[name=min], .product-table input[name=max] { min-width: 7.5rem; }
