@@ -18,7 +18,7 @@
                     var formName = $"dp-{product.Id}";
                     <tr>
                         <td><form method="post" @formname="@formName" @onsubmit="() => SaveDepositAsync(product.Id)" id="@formName"><AntiforgeryToken /></form>
-                            <input form="@formName" name="name" class="form-control form-control-sm" value="@product.Name" placeholder="@(product.Id == 0 ? "Новий продукт…" : "")" required /></td>
+                            <input form="@formName" name="name" class="form-control form-control-sm product-name" value="@product.Name" placeholder="@(product.Id == 0 ? "Новий продукт…" : "")" required /></td>
                         <td><CurrencySelect FormId="@formName" Currencies="_currencies" Value="@product.CurrencyCode" /></td>
                         <td><input form="@formName" name="rate" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.AnnualRate.ToString(CultureInfo.InvariantCulture)" /></td>
                         <td><input form="@formName" name="term" type="number" min="1" max="120" class="form-control form-control-sm text-end" value="@product.TermMonths" /></td>
@@ -45,7 +45,7 @@
                     var formName = $"cp-{product.Id}";
                     <tr>
                         <td><form method="post" @formname="@formName" @onsubmit="() => SaveCreditAsync(product.Id)" id="@formName"><AntiforgeryToken /></form>
-                            <input form="@formName" name="name" class="form-control form-control-sm" value="@product.Name" placeholder="@(product.Id == 0 ? "Новий продукт…" : "")" required /></td>
+                            <input form="@formName" name="name" class="form-control form-control-sm product-name" value="@product.Name" placeholder="@(product.Id == 0 ? "Новий продукт…" : "")" required /></td>
                         <td><CurrencySelect FormId="@formName" Currencies="_currencies" Value="@product.CurrencyCode" /></td>
                         <td><input form="@formName" name="rate" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.AnnualRate.ToString(CultureInfo.InvariantCulture)" /></td>
                         <td><input form="@formName" name="minTerm" type="number" min="1" class="form-control form-control-sm text-end" value="@product.MinTermMonths" /></td>

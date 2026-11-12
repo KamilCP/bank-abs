@@ -1,4 +1,4 @@
-<select form="@FormId" name="currency" class="form-select form-select-sm" aria-label="Валюта">
+<select form="@FormId" name="currency" class="form-select form-select-sm currency-select" aria-label="Валюта">
     @foreach (var currency in Currencies)
     {
         <option value="@currency.Code" selected="@(currency.Code == Value)">@currency.Code</option>
