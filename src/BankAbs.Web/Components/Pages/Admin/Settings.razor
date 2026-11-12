@@ -1,0 +1,91 @@
+@page "/admin/settings"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.AdminSettings)]
+@inherits AppPageBase
+@inject ParameterRepository Parameters
+
+<PageHeader Title="Параметри системи" Icon="sliders" Subtitle="Налаштування роботи банку, безпеки та інтерфейсу. Зміни записуються в журнал системи" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+<div class="row g-3" style="max-width: 1200px">
+    <div class="col-xl-8">
+        <form method="post" @formname="settings" @onsubmit="SaveAsync" class="panel">
+            <AntiforgeryToken />
+            @foreach (var group in _parameters.GroupBy(p => p.Category))
+            {
+                <div class="panel-title mt-2"><i class="bi bi-gear"></i>@group.Key</div>
+                <div class="row g-2 mb-3">
+                    @foreach (var p in group)
+                    {
+                        <div class="col-md-8"><label class="form-label mb-0" for="@($"p-{p.Key}")">@p.Name</label><div class="small text-body-tertiary font-monospace">@p.Key</div></div>
+                        <div class="col-md-4">
+                            @if (p.ValueType == "bool")
+                            {
+                                <select id="@($"p-{p.Key}")" name="@($"p:{p.Key}")" class="form-select form-select-sm">
+                                    <option value="true" selected="@(p.Value == "true")">Так</option>
+                                    <option value="false" selected="@(p.Value == "false")">Ні</option>
+                                </select>
+                            }
+                            else
+                            {
+                                <input id="@($"p-{p.Key}")" name="@($"p:{p.Key}")" class="form-control form-control-sm @(p.ValueType == "text" ? "" : "text-end")"
+                                       value="@p.Value" inputmode="@(p.ValueType == "text" ? "text" : "decimal")" />
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Зберегти параметри</button>
+        </form>
+    </div>
+    <div class="col-xl-4">
+        <form method="post" @formname="close-day" @onsubmit="CloseDayAsync" class="panel">
+            <AntiforgeryToken />
+            <div class="panel-title"><i class="bi bi-moon-stars"></i>Закриття операційного дня</div>
+            <p class="small text-secondary">Виконує збережену процедуру <code>sp_close_day</code>: нараховує щомісячні відсотки за вкладами,
+                закриває вклади із завершеним строком і позначає прострочені кредити.</p>
+            <input type="date" name="day" class="form-control mb-3" value="@Fmt.Today.ToString("yyyy-MM-dd")" aria-label="Дата закриття" />
+            <button class="btn btn-outline-primary" data-confirm="Виконати закриття операційного дня?"><i class="bi bi-play-circle me-1"></i>Виконати</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    private List<SystemParameter> _parameters = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _parameters = await Parameters.ListAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        var form = Form;
+        var changed = _parameters.Where(p => form.Text("p:" + p.Key) != p.Value).ToList();
+        foreach (var p in changed)
+        {
+            var value = form.Text("p:" + p.Key);
+            if (p.ValueType == "decimal")
+            {
+                value = value.Replace(',', '.');
+            }
+
+            if (!await TryAsync(() => Parameters.UpdateAsync(p.Key, value)))
+            {
+                p.Value = value;
+                return;
+            }
+        }
+
+        RedirectWithNotice("admin/settings", "settings-saved");
+    }
+
+    private async Task CloseDayAsync()
+    {
+        var day = Form.Date("day") ?? Fmt.Today;
+        if (await TryAsync(() => Parameters.CloseDayAsync(day)))
+        {
+            RedirectWithNotice("admin/settings", "day-closed");
+        }
+    }
+}

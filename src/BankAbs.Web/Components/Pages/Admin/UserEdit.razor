@@ -1,0 +1,187 @@
+@page "/admin/users/new"
+@page "/admin/users/{Id:int}"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.AdminUsers)]
+@inherits AppPageBase
+@inject UserRepository Users
+@inject RoleRepository Roles
+@inject ParameterRepository Parameters
+
+<PageHeader Title="@(Id is null ? "Новий користувач" : $"Користувач {_user?.Login}")" Icon="person-gear" ParentTitle="Користувачі" ParentHref="admin/users" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+@if (_user is not null)
+{
+    <div class="row g-3" style="max-width: 1100px">
+        <div class="col-lg-7">
+            <form method="post" @formname="user" @onsubmit="SaveAsync" class="panel">
+                <AntiforgeryToken />
+                <div class="panel-title"><i class="bi bi-person-vcard"></i>Обліковий запис</div>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label required" for="login">Логін</label>
+                        <input id="login" name="login" class="form-control" value="@_user.Login" disabled="@(Id is not null)" maxlength="50" pattern="[a-z0-9_.]{3,50}" required />
+                        <div class="form-hint">Латинські малі літери, цифри, «.» і «_» (3–50 символів)</div>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label required" for="fullName">ПІБ</label>
+                        <input id="fullName" name="fullName" class="form-control" value="@_user.FullName" maxlength="150" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label required" for="role">Роль</label>
+                        <select id="role" name="role" class="form-select">
+                            @foreach (var role in _roles)
+                            {
+                                <option value="@role.Code" selected="@(role.Code == _user.RoleCode)">@role.Name</option>
+                            }
+                        </select>
+                        <div class="form-hint">Права ролі налаштовуються в розділі <a href="admin/roles">«Ролі і права»</a></div>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-center">
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="active" name="active" checked="@_user.IsActive" />
+                            <label class="form-check-label" for="active">Активний (може входити в систему)</label>
+                        </div>
+                    </div>
+                    @if (Id is null)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label required" for="password">Пароль</label>
+                            <input id="password" name="password" type="password" class="form-control" autocomplete="new-password" required />
+                            <div class="form-hint">Не менше @_minLength символів, літери і цифри</div>
+                        </div>
+                    }
+                </div>
+                <div class="d-flex gap-2 mt-4">
+                    <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Зберегти</button>
+                    <a class="btn btn-outline-secondary" href="admin/users">До списку</a>
+                </div>
+            </form>
+        </div>
+        @if (Id is not null)
+        {
+            <div class="col-lg-5">
+                <form method="post" @formname="password" @onsubmit="ResetPasswordAsync" class="panel">
+                    <AntiforgeryToken />
+                    <div class="panel-title"><i class="bi bi-key"></i>Новий пароль</div>
+                    <input name="password" type="password" class="form-control mb-2" autocomplete="new-password" placeholder="Новий пароль" aria-label="Новий пароль" required />
+                    <div class="form-hint mb-3">Не менше @_minLength символів, літери і цифри. Блокування після невдалих спроб буде знято</div>
+                    <button class="btn btn-outline-primary" data-confirm="Змінити пароль користувача?"><i class="bi bi-key me-1"></i>Встановити пароль</button>
+                </form>
+                <div class="panel">
+                    <div class="panel-title"><i class="bi bi-shield-check"></i>Безпека</div>
+                    <dl class="row small mb-2">
+                        <dt class="col-6">Останній вхід</dt><dd class="col-6">@Fmt.DateTime(_user.LastLoginAt)</dd>
+                        <dt class="col-6">Невдалих спроб</dt><dd class="col-6">@_user.FailedAttempts</dd>
+                        <dt class="col-6">Заблоковано до</dt><dd class="col-6">@(_user.LockedUntil > DateTime.UtcNow ? Fmt.DateTime(_user.LockedUntil) : "—")</dd>
+                    </dl>
+                    @if (_user.LockedUntil > DateTime.UtcNow || _user.FailedAttempts > 0)
+                    {
+                        <form method="post" @formname="unlock" @onsubmit="UnlockAsync">
+                            <AntiforgeryToken />
+                            <button class="btn btn-sm btn-outline-success"><i class="bi bi-unlock me-1"></i>Зняти блокування</button>
+                        </form>
+                    }
+                    <a class="small" href="admin/log?owner=@Id">Дії користувача в журналі системи</a>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private AppUser? _user;
+    private List<AppRole> _roles = [];
+    private int _minLength = PasswordPolicy.DefaultMinLength;
+
+    [Parameter] public int? Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await Roles.RolesAsync();
+        _minLength = await Parameters.GetIntAsync("security.min_password_length", PasswordPolicy.DefaultMinLength);
+        _user = Id is null ? new AppUser { RoleCode = "operator" } : await Users.GetAsync(Id.Value);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_user is null)
+        {
+            return;
+        }
+
+        var form = Form;
+        if (Id is null)
+        {
+            _user.Login = form.Text("login").ToLowerInvariant();
+        }
+
+        _user.FullName = form.Text("fullName");
+        _user.RoleCode = form.Text("role");
+        _user.IsActive = form.Bool("active");
+        if (Id is not null && _user.Id == CurrentUser.UserId && !_user.IsActive)
+        {
+            Errors.Add("Не можна заблокувати власний обліковий запис");
+        }
+
+        if (_user.FullName.Length < 3)
+        {
+            Errors.Add("Вкажіть ПІБ користувача");
+        }
+
+        var password = form.Text("password");
+        if (Id is null)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(_user.Login, "^[a-z0-9_.]{3,50}$"))
+            {
+                Errors.Add("Логін має містити 3–50 символів: латинські малі літери, цифри, «.» або «_»");
+            }
+
+            Errors.AddRange(PasswordPolicy.Validate(password, _user.Login, _minLength));
+        }
+
+        if (Errors.Count > 0)
+        {
+            return;
+        }
+
+        var id = _user.Id;
+        if (await TryAsync(async () =>
+            {
+                if (Id is null)
+                {
+                    id = await Users.CreateAsync(_user, PasswordHasher.Hash(password));
+                }
+                else
+                {
+                    await Users.UpdateAsync(_user);
+                }
+            }))
+        {
+            RedirectWithNotice($"admin/users/{id}", Id is null ? "user-created" : "user-saved");
+        }
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        if (_user is null)
+        {
+            return;
+        }
+
+        var password = Form.Text("password");
+        Errors.AddRange(PasswordPolicy.Validate(password, _user.Login, _minLength));
+        if (Errors.Count == 0 && await TryAsync(() => Users.SetPasswordAsync(_user.Id, PasswordHasher.Hash(password))))
+        {
+            RedirectWithNotice($"admin/users/{_user.Id}", "password-reset");
+        }
+    }
+
+    private async Task UnlockAsync()
+    {
+        if (_user is not null && await TryAsync(() => Users.UnlockAsync(_user.Id)))
+        {
+            RedirectWithNotice($"admin/users/{_user.Id}", "user-unlocked");
+        }
+    }
+}

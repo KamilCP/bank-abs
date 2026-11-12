@@ -1,0 +1,88 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.AdminUsers)]
+@inherits AppPageBase
+@inject UserRepository Users
+@inject RoleRepository Roles
+@inject ParameterRepository Parameters
+
+<PageHeader Title="Користувачі" Icon="person-gear" Subtitle="Облікові записи працівників: логін, роль, стан, останній вхід">
+    <a class="btn btn-primary" href="admin/users/new"><i class="bi bi-person-plus me-1"></i>Новий користувач</a>
+</PageHeader>
+
+<AlertMessage Success="@SuccessText" />
+
+<div class="panel">
+    <form method="get" action="admin/users" class="filter-bar">
+        <SearchField Value="@Q" Placeholder="Логін або ПІБ…" />
+        <select name="kind" class="form-select" data-autosubmit aria-label="Роль">
+            <option value="">Усі ролі</option>
+            @foreach (var role in _roles)
+            {
+                <option value="@role.Code" selected="@(Kind == role.Code)">@role.Name</option>
+            }
+        </select>
+        <select name="status" class="form-select" data-autosubmit aria-label="Стан">
+            <option value="">Усі</option>
+            <option value="active" selected="@(Status == "active")">Активні</option>
+            <option value="blocked" selected="@(Status == "blocked")">Заблоковані</option>
+        </select>
+        <FilterButtons ResetUrl="admin/users" />
+    </form>
+    <div class="table-wrap">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <SortLink Column="login" Title="Логін" State="_state" />
+                    <SortLink Column="name" Title="ПІБ" State="_state" />
+                    <SortLink Column="role" Title="Роль" State="_state" />
+                    <SortLink Column="lastLogin" Title="Останній вхід" State="_state" />
+                    <th class="num">Невдалих спроб</th>
+                    <SortLink Column="active" Title="Стан" State="_state" />
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in _result.Items)
+                {
+                    var locked = user.LockedUntil > DateTime.UtcNow;
+                    <tr>
+                        <td><a class="fw-semibold" href="admin/users/@user.Id">@user.Login</a></td>
+                        <td>@user.FullName</td>
+                        <td>@user.RoleName</td>
+                        <td class="small">@Fmt.DateTime(user.LastLoginAt)</td>
+                        <td class="num">@user.FailedAttempts</td>
+                        <td><StatusBadge Kind="user" Value="@(!user.IsActive ? "blocked" : locked ? "locked" : "active")" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <Pager Result="_result" State="_state" />
+</div>
+
+@code {
+    private ListState _state = new();
+    private PagedResult<AppUser> _result = PagedResult<AppUser>.Empty(ListQuery.DefaultPageSize);
+    private List<AppRole> _roles = [];
+
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+    [SupplyParameterFromQuery] public bool? Desc { get; set; }
+    [SupplyParameterFromQuery] public int? Page { get; set; }
+    [SupplyParameterFromQuery] public string? Kind { get; set; }
+    [SupplyParameterFromQuery] public string? Status { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = new ListState
+        {
+            Path = "admin/users", Q = Q, Sort = Sort, Desc = Desc == true, Page = Page ?? 1,
+            Kind = string.IsNullOrEmpty(Kind) ? null : Kind, Status = string.IsNullOrEmpty(Status) ? null : Status,
+        };
+        _roles = await Roles.RolesAsync();
+        _result = await Users.ListAsync(_state.ToQuery(PageSizeOrDefault(await Parameters.GetIntAsync("ui.page_size", ListQuery.DefaultPageSize))));
+        if (_state.IsInitial)
+        {
+            await Audit.TableViewedAsync("app_user", "Користувачі");
+        }
+    }
+}

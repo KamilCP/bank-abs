@@ -1,0 +1,98 @@
+@page "/admin/roles"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.AdminRoles)]
+@inherits AppPageBase
+@inject RoleRepository Roles
+
+<PageHeader Title="Ролі і права доступу" Icon="shield-lock" Subtitle="Відмітьте функції системи, доступні кожній ролі. Зміни застосовуються без повторного входу" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+<form method="post" @formname="roles" @onsubmit="SaveAsync" class="panel">
+    <AntiforgeryToken />
+    <div class="table-wrap">
+        <table class="table table-sm table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Модуль</th>
+                    <th>Функція</th>
+                    @foreach (var role in _roles)
+                    {
+                        <th class="text-center">@role.Name<div class="fw-normal text-lowercase small">@role.UserCount корист.</div></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var group in _permissions.GroupBy(p => p.Module))
+                {
+                    var first = true;
+                    foreach (var permission in group)
+                    {
+                        <tr>
+                            <td class="small text-secondary">@(first ? group.Key : "")</td>
+                            <td>@permission.Name <span class="small text-body-tertiary font-monospace">@permission.Code</span></td>
+                            @foreach (var role in _roles)
+                            {
+                                var locked = role.Code == "admin" && permission.Code is Permissions.AdminUsers or Permissions.AdminRoles;
+                                <td class="text-center">
+                                    <input class="form-check-input" type="checkbox" name="grant" value="@($"{role.Code}|{permission.Code}")"
+                                           checked="@_grants.Contains((role.Code, permission.Code))" disabled="@locked"
+                                           title="@(locked ? "Право не знімається з ролі адміністратора" : "")" aria-label="@($"{role.Name}: {permission.Name}")" />
+                                </td>
+                            }
+                        </tr>
+                        first = false;
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-primary" data-confirm="Зберегти права доступу для всіх ролей?"><i class="bi bi-check-lg me-1"></i>Зберегти права</button>
+        <a class="btn btn-outline-secondary" href="admin/roles">Скасувати зміни</a>
+    </div>
+</form>
+
+<div class="panel">
+    <div class="panel-title"><i class="bi bi-people"></i>Ролі</div>
+    <table class="table table-sm w-auto">
+        <thead><tr><th>Код</th><th>Назва</th><th>Опис</th><th class="num">Користувачів</th></tr></thead>
+        <tbody>
+            @foreach (var role in _roles)
+            {
+                <tr><td class="font-monospace">@role.Code</td><td>@role.Name</td><td class="small">@role.Description</td><td class="num"><a href="admin/users?kind=@role.Code">@role.UserCount</a></td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<AppRole> _roles = [];
+    private List<AppPermission> _permissions = [];
+    private HashSet<(string Role, string Permission)> _grants = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await Roles.RolesAsync();
+        _permissions = await Roles.PermissionsAsync();
+        _grants = await Roles.GrantsAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        var selected = Form.All("grant")
+            .Select(v => v.Split('|'))
+            .Where(p => p.Length == 2)
+            .Select(p => (Role: p[0], Permission: p[1]))
+            .ToList();
+        if (await TryAsync(async () =>
+            {
+                foreach (var role in _roles)
+                {
+                    await Roles.SetPermissionsAsync(role.Code, selected.Where(s => s.Role == role.Code).Select(s => s.Permission).ToList());
+                }
+            }))
+        {
+            RedirectWithNotice("admin/roles", "roles-saved");
+        }
+    }
+}

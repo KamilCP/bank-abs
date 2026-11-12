@@ -1,0 +1,121 @@
+@page "/admin/log"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.AdminLog)]
+@inherits AppPageBase
+@inject AuditRepository AuditLog
+@inject UserRepository Users
+@inject ParameterRepository Parameters
+
+<PageHeader Title="Журнал системи" Icon="list-check" Subtitle="Вхід і вихід користувачів, зміни даних (тригери БД), робота з таблицями, звіти" />
+
+<div class="panel">
+    <form method="get" action="admin/log" class="filter-bar">
+        <SearchField Value="@Q" Placeholder="Текст опису або даних, № запису…" />
+        <input type="date" name="from" class="form-control" value="@From?.ToString("yyyy-MM-dd")" title="З дати" aria-label="З дати" />
+        <input type="date" name="to" class="form-control" value="@To?.ToString("yyyy-MM-dd")" title="По дату" aria-label="По дату" />
+        <select name="owner" class="form-select" data-autosubmit aria-label="Користувач">
+            <option value="">Усі користувачі</option>
+            @foreach (var user in _users)
+            {
+                <option value="@user.Id" selected="@(Owner == user.Id)">@user.Login</option>
+            }
+        </select>
+        <select name="kind" class="form-select" data-autosubmit aria-label="Подія">
+            <option value="">Усі події</option>
+            @foreach (var type in AuditEventTypes.All)
+            {
+                <option value="@type" selected="@(Kind == type)">@AuditEventTypes.Title(type)</option>
+            }
+        </select>
+        <select name="status" class="form-select" data-autosubmit aria-label="Таблиця">
+            <option value="">Усі таблиці</option>
+            @foreach (var table in _tables)
+            {
+                <option value="@table" selected="@(Status == table)">@table</option>
+            }
+        </select>
+        <FilterButtons ResetUrl="admin/log" />
+    </form>
+
+    <div class="table-wrap">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <SortLink Column="time" Title="Час" State="_state" />
+                    <SortLink Column="user" Title="Користувач" State="_state" />
+                    <SortLink Column="type" Title="Подія" State="_state" />
+                    <SortLink Column="table" Title="Таблиця" State="_state" />
+                    <th>Опис і дані</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in _result.Items)
+                {
+                    <tr>
+                        <td class="small text-secondary">@entry.Id</td>
+                        <td class="small text-nowrap">@Fmt.DateTime(entry.EventTime)</td>
+                        <td class="small">@entry.UserLogin</td>
+                        <td><span class="badge @EventCss(entry.EventType)">@AuditEventTypes.Title(entry.EventType)</span></td>
+                        <td class="small font-monospace">@entry.TableName @(entry.RecordId.Length > 0 ? "#" + entry.RecordId : "")</td>
+                        <td class="small" style="max-width: 560px">
+                            @entry.Summary
+                            @if (!string.IsNullOrEmpty(entry.Details))
+                            {
+                                <details><summary class="text-secondary">дані</summary><pre class="details-json">@entry.Details</pre></details>
+                            }
+                        </td>
+                        <td class="small text-secondary">@entry.IpAddress</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <Pager Result="_result" State="_state" />
+</div>
+
+@code {
+    private ListState _state = new();
+    private PagedResult<AuditEntry> _result = PagedResult<AuditEntry>.Empty(ListQuery.DefaultPageSize);
+    private List<AppUser> _users = [];
+    private List<string> _tables = [];
+
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+    [SupplyParameterFromQuery] public bool? Desc { get; set; }
+    [SupplyParameterFromQuery] public int? Page { get; set; }
+    [SupplyParameterFromQuery] public string? Kind { get; set; }
+    [SupplyParameterFromQuery] public string? Status { get; set; }
+    [SupplyParameterFromQuery] public int? Owner { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? From { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? To { get; set; }
+
+    private static string EventCss(string type) => type switch
+    {
+        AuditEventTypes.Login or AuditEventTypes.Logout => "badge-ok",
+        AuditEventTypes.LoginFailed or AuditEventTypes.Delete => "badge-bad",
+        AuditEventTypes.Update or AuditEventTypes.Action => "badge-warn",
+        AuditEventTypes.Insert => "badge-type",
+        _ => "badge-off",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = new ListState
+        {
+            Path = "admin/log", Q = Q, Sort = Sort, Desc = Desc == true, Page = Page ?? 1,
+            Kind = string.IsNullOrEmpty(Kind) ? null : Kind, Status = string.IsNullOrEmpty(Status) ? null : Status,
+            Owner = Owner, From = From, To = To,
+        };
+        _users = await Users.AllAsync();
+        _tables = await AuditLog.TablesAsync();
+        var query = _state.ToQuery(PageSizeOrDefault(await Parameters.GetIntAsync("ui.page_size", ListQuery.DefaultPageSize)));
+        if (query.SortBy is null)
+        {
+            query.SortBy = "time";
+            query.Descending = true;
+        }
+
+        _result = await AuditLog.ListAsync(query);
+    }
+}
