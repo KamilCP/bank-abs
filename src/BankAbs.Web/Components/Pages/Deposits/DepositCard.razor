@@ -27,7 +27,7 @@ else
         <KpiCard Title="Сума на рахунку вкладу" Value="@Fmt.Money(_deposit.CurrentAmount, _deposit.CurrencyCode)" Icon="cash-stack" Tone="green" Note="@($"розміщено {Fmt.Money(_deposit.Principal)}")" />
         <KpiCard Title="Нараховано відсотків" Value="@Fmt.Money(_deposit.InterestPaid, _deposit.CurrencyCode)" Icon="percent" Tone="violet" Note="@($"останнє нарахування {Fmt.Date(_deposit.LastAccrualDate)}")" />
         <KpiCard Title="Ставка" Value="@Fmt.Rate(_deposit.AnnualRate)" Icon="graph-up-arrow" Note="@(_deposit.Capitalization ? "з капіталізацією" : "виплата щомісяця")" />
-        <KpiCard Title="Строк" Value="@($"{Fmt.Date(_deposit.StartDate)} – {Fmt.Date(_deposit.EndDate)}")" Icon="calendar-range" Tone="orange" />
+        <KpiCard Title="Строк" Value="@($"до {Fmt.Date(_deposit.EndDate)}")" Icon="calendar-range" Tone="orange" Note="@($"з {Fmt.Date(_deposit.StartDate)}")" />
     </div>
 
     <div class="panel" style="max-width: 860px">
