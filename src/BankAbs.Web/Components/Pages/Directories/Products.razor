@@ -1,0 +1,119 @@
+@page "/directories/products"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.DirectoriesEdit)]
+@inherits AppPageBase
+@inject DirectoryRepository Directories
+
+<PageHeader Title="Продукти банку" Icon="box-seam" Subtitle="Умови депозитних і кредитних продуктів для нових договорів" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+<div class="panel">
+    <div class="panel-title"><i class="bi bi-piggy-bank"></i>Депозитні продукти</div>
+    <div class="table-wrap">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Назва</th><th>Валюта</th><th class="num">Ставка, %</th><th class="num">Строк, міс.</th><th class="num">Мін. сума</th><th>Капіталізація</th><th>Дострокове розірвання</th><th>Доступний</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var product in _deposits.Append(new DepositProduct { Name = string.Empty }))
+                {
+                    var formName = $"dp-{product.Id}";
+                    <tr>
+                        <td><form method="post" @formname="@formName" @onsubmit="() => SaveDepositAsync(product.Id)" id="@formName"><AntiforgeryToken /></form>
+                            <input form="@formName" name="name" class="form-control form-control-sm" value="@product.Name" placeholder="@(product.Id == 0 ? "Новий продукт…" : "")" required /></td>
+                        <td><CurrencySelect FormId="@formName" Currencies="_currencies" Value="@product.CurrencyCode" /></td>
+                        <td><input form="@formName" name="rate" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.AnnualRate.ToString(CultureInfo.InvariantCulture)" /></td>
+                        <td><input form="@formName" name="term" type="number" min="1" max="120" class="form-control form-control-sm text-end" value="@product.TermMonths" /></td>
+                        <td><input form="@formName" name="min" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.MinAmount.ToString(CultureInfo.InvariantCulture)" /></td>
+                        <td class="text-center"><input form="@formName" name="cap" type="checkbox" class="form-check-input" checked="@product.Capitalization" /></td>
+                        <td class="text-center"><input form="@formName" name="early" type="checkbox" class="form-check-input" checked="@product.EarlyWithdrawal" /></td>
+                        <td class="text-center"><input form="@formName" name="active" type="checkbox" class="form-check-input" checked="@product.IsActive" /></td>
+                        <td class="text-end"><button form="@formName" class="btn btn-sm @(product.Id == 0 ? "btn-primary" : "btn-outline-primary")">@(product.Id == 0 ? "Додати" : "Зберегти")</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title"><i class="bi bi-credit-card-2-front"></i>Кредитні продукти</div>
+    <div class="table-wrap">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Назва</th><th>Валюта</th><th class="num">Ставка, %</th><th class="num">Строк від</th><th class="num">Строк до</th><th class="num">Сума від</th><th class="num">Сума до</th><th>Доступний</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var product in _credits.Append(new CreditProduct { Name = string.Empty }))
+                {
+                    var formName = $"cp-{product.Id}";
+                    <tr>
+                        <td><form method="post" @formname="@formName" @onsubmit="() => SaveCreditAsync(product.Id)" id="@formName"><AntiforgeryToken /></form>
+                            <input form="@formName" name="name" class="form-control form-control-sm" value="@product.Name" placeholder="@(product.Id == 0 ? "Новий продукт…" : "")" required /></td>
+                        <td><CurrencySelect FormId="@formName" Currencies="_currencies" Value="@product.CurrencyCode" /></td>
+                        <td><input form="@formName" name="rate" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.AnnualRate.ToString(CultureInfo.InvariantCulture)" /></td>
+                        <td><input form="@formName" name="minTerm" type="number" min="1" class="form-control form-control-sm text-end" value="@product.MinTermMonths" /></td>
+                        <td><input form="@formName" name="maxTerm" type="number" min="1" max="360" class="form-control form-control-sm text-end" value="@product.MaxTermMonths" /></td>
+                        <td><input form="@formName" name="min" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.MinAmount.ToString(CultureInfo.InvariantCulture)" /></td>
+                        <td><input form="@formName" name="max" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" value="@product.MaxAmount.ToString(CultureInfo.InvariantCulture)" /></td>
+                        <td class="text-center"><input form="@formName" name="active" type="checkbox" class="form-check-input" checked="@product.IsActive" /></td>
+                        <td class="text-end"><button form="@formName" class="btn btn-sm @(product.Id == 0 ? "btn-primary" : "btn-outline-primary")">@(product.Id == 0 ? "Додати" : "Зберегти")</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="form-hint mt-2">Продукт, за яким укладено договори, не видаляється: зніміть позначку «Доступний», щоб припинити оформлення нових договорів.</div>
+</div>
+
+@code {
+    private List<DepositProduct> _deposits = [];
+    private List<CreditProduct> _credits = [];
+    private List<Currency> _currencies = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _deposits = await Directories.DepositProductsAsync(activeOnly: false);
+        _credits = await Directories.CreditProductsAsync(activeOnly: false);
+        _currencies = await Directories.CurrenciesAsync();
+    }
+
+    private async Task SaveDepositAsync(int id)
+    {
+        var f = Form;
+        var product = new DepositProduct
+        {
+            Id = id, Name = f.Text("name"), CurrencyCode = f.Text("currency"), AnnualRate = f.Decimal("rate") ?? -1,
+            TermMonths = f.Int("term") ?? 0, MinAmount = f.Decimal("min") ?? 0, Capitalization = f.Bool("cap"),
+            EarlyWithdrawal = f.Bool("early"), IsActive = f.Bool("active"),
+        };
+        if (product.Name.Length == 0 || product.AnnualRate < 0 || product.TermMonths <= 0)
+        {
+            Errors.Add("Вкажіть назву, ставку і строк депозитного продукту");
+            return;
+        }
+
+        if (await TryAsync(() => Directories.SaveDepositProductAsync(product)))
+        {
+            RedirectWithNotice("directories/products", "product-saved");
+        }
+    }
+
+    private async Task SaveCreditAsync(int id)
+    {
+        var f = Form;
+        var product = new CreditProduct
+        {
+            Id = id, Name = f.Text("name"), CurrencyCode = f.Text("currency"), AnnualRate = f.Decimal("rate") ?? -1,
+            MinTermMonths = f.Int("minTerm") ?? 0, MaxTermMonths = f.Int("maxTerm") ?? 0,
+            MinAmount = f.Decimal("min") ?? 0, MaxAmount = f.Decimal("max") ?? 0, IsActive = f.Bool("active"),
+        };
+        if (product.Name.Length == 0 || product.AnnualRate < 0 || product.MinTermMonths <= 0
+            || product.MaxTermMonths < product.MinTermMonths || product.MaxAmount <= 0 || product.MaxAmount < product.MinAmount)
+        {
+            Errors.Add("Перевірте назву, ставку, строки (від ≤ до) і суми (від ≤ до) кредитного продукту");
+            return;
+        }
+
+        if (await TryAsync(() => Directories.SaveCreditProductAsync(product)))
+        {
+            RedirectWithNotice("directories/products", "product-saved");
+        }
+    }
+}

@@ -1,0 +1,71 @@
+@page "/directories/currencies"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.DirectoriesEdit)]
+@inherits AppPageBase
+@inject DirectoryRepository Directories
+@inject ParameterRepository Parameters
+
+<PageHeader Title="Валюти і курси" Icon="currency-exchange" Subtitle="Офіційні курси до гривні. Курс конвертації для клієнтів враховує маржу банку" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+<div class="panel" style="max-width: 980px">
+    <div class="table-wrap">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Код</th><th>Назва</th><th>Символ</th><th class="num">Офіційний курс, грн</th><th class="num">Купівля банком</th><th class="num">Продаж банком</th><th>Оновлено</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var currency in _currencies)
+                {
+                    <tr>
+                        <td class="fw-semibold">@currency.Code</td>
+                        <td>@currency.Name @(currency.IsBase ? "(базова)" : "")</td>
+                        <td>@currency.Symbol</td>
+                        @if (currency.IsBase)
+                        {
+                            <td class="num">1,0000</td><td class="num">—</td><td class="num">—</td><td class="small text-secondary">—</td><td></td>
+                        }
+                        else
+                        {
+                            <td class="num" colspan="1">
+                                <form method="post" @formname="@($"rate-{currency.Code}")" @onsubmit="() => SaveRateAsync(currency.Code)" id="@($"rate-{currency.Code}")" class="d-flex justify-content-end">
+                                    <AntiforgeryToken />
+                                    <input name="rate" type="number" step="0.000001" min="0.000001" class="form-control form-control-sm text-end" style="max-width: 130px" value="@currency.RateToBase.ToString(CultureInfo.InvariantCulture)" aria-label="Курс @currency.Code" />
+                                </form>
+                            </td>
+                            <td class="num">@Fmt.ExchangeRate(CurrencyConverter.Rate(currency.RateToBase, 1m, _margin))</td>
+                            <td class="num">@Fmt.ExchangeRate(1m / CurrencyConverter.Rate(1m, currency.RateToBase, _margin))</td>
+                            <td class="small text-secondary">@Fmt.DateTime(currency.UpdatedAt)</td>
+                            <td class="text-end"><button form="@($"rate-{currency.Code}")" class="btn btn-sm btn-outline-primary"><i class="bi bi-check-lg"></i> Зберегти</button></td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="form-hint mt-2">Маржа банку при конвертації: <b>@Fmt.Rate(_margin)</b> (параметр системи «fx.margin_percent»). Купівля — скільки гривень клієнт отримає за 1 одиницю валюти; продаж — скільки гривень коштує 1 одиниця валюти.</div>
+</div>
+
+@code {
+    private List<Currency> _currencies = [];
+    private decimal _margin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currencies = await Directories.CurrenciesAsync();
+        _margin = await Parameters.GetDecimalAsync("fx.margin_percent", 0m);
+    }
+
+    private async Task SaveRateAsync(string code)
+    {
+        var rate = Form.Decimal("rate");
+        if (rate is not > 0)
+        {
+            Errors.Add("Курс має бути додатним числом");
+            return;
+        }
+
+        if (await TryAsync(() => Directories.UpdateRateAsync(code, rate.Value)))
+        {
+            RedirectWithNotice("directories/currencies", "rate-saved");
+        }
+    }
+}
