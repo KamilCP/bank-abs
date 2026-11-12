@@ -1,0 +1,125 @@
+@page "/operations"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.OperationsView)]
+@inherits AppPageBase
+@inject OperationRepository Operations
+@inject DirectoryRepository Directories
+@inject ParameterRepository Parameters
+
+<PageHeader Title="Журнал операцій" Icon="journal-text" Subtitle="Усі фінансові операції: каса, перекази, депозити, кредити">
+    @if (CurrentUser.Can(Permissions.CashOperate))
+    {
+        <a class="btn btn-outline-primary" href="operations/cash"><i class="bi bi-cash-coin me-1"></i>Каса</a>
+    }
+    @if (CurrentUser.Can(Permissions.TransfersMake))
+    {
+        <a class="btn btn-primary" href="operations/transfer"><i class="bi bi-arrow-left-right me-1"></i>Переказ</a>
+    }
+</PageHeader>
+
+<div class="panel">
+    <form method="get" action="operations" class="filter-bar">
+        <SearchField Value="@Q" Placeholder="№, рахунок, клієнт, призначення…" />
+        <input type="date" name="from" class="form-control" value="@From?.ToString("yyyy-MM-dd")" aria-label="Період з" title="Період з" />
+        <input type="date" name="to" class="form-control" value="@To?.ToString("yyyy-MM-dd")" aria-label="Період по" title="Період по" />
+        <select name="kind" class="form-select" data-autosubmit aria-label="Тип операції">
+            <option value="">Усі операції</option>
+            @foreach (var type in OperationTypes.All)
+            {
+                <option value="@type" selected="@(Kind == type)">@OperationTypes.Title(type)</option>
+            }
+        </select>
+        <select name="currency" class="form-select" data-autosubmit aria-label="Валюта">
+            <option value="">Усі валюти</option>
+            @foreach (var currency in _currencies)
+            {
+                <option value="@currency.Code" selected="@(Currency == currency.Code)">@currency.Code</option>
+            }
+        </select>
+        @if (Sort is not null)
+        {
+            <input type="hidden" name="sort" value="@Sort" />
+            <input type="hidden" name="desc" value="@(Desc == true ? "true" : "false")" />
+        }
+        <FilterButtons ResetUrl="operations" />
+    </form>
+
+    <div class="table-wrap">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <SortLink Column="time" Title="Час" State="_state" />
+                    <SortLink Column="type" Title="Операція" State="_state" />
+                    <th>Списання</th>
+                    <th>Зарахування</th>
+                    <th>Призначення</th>
+                    <SortLink Column="amount" Title="Сума" State="_state" CssClass="num" />
+                    <SortLink Column="user" Title="Виконавець" State="_state" />
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var op in _result.Items)
+                {
+                    <tr>
+                        <td class="text-secondary small">@op.Id</td>
+                        <td class="text-nowrap small">@Fmt.DateTime(op.OpTime)</td>
+                        <td><span class="badge badge-type">@OperationTypes.Title(op.OpType)</span></td>
+                        <td class="small">@(op.FromClient ?? "—")<div class="font-monospace text-secondary">@op.FromNumber</div></td>
+                        <td class="small">@(op.ToClient ?? "—")<div class="font-monospace text-secondary">@op.ToNumber</div></td>
+                        <td class="small">@op.Description</td>
+                        <td class="num fw-semibold">@Fmt.Money(op.Amount, op.CurrencyCode)
+                            @if (op.AmountTo is not null)
+                            {
+                                <div class="small text-secondary fw-normal">→ @Fmt.Money(op.AmountTo.Value, op.CurrencyTo)</div>
+                            }
+                        </td>
+                        <td class="small text-secondary">@op.UserLogin</td>
+                    </tr>
+                }
+            </tbody>
+            @if (_result.Items.Count > 0)
+            {
+                <tfoot><tr><td colspan="6">Разом на сторінці (еквівалент у гривні)</td><td class="num">@Fmt.Money(_result.Items.Sum(o => o.AmountBase))</td><td></td></tr></tfoot>
+            }
+        </table>
+    </div>
+    <Pager Result="_result" State="_state" />
+</div>
+
+@code {
+    private ListState _state = new();
+    private PagedResult<Operation> _result = PagedResult<Operation>.Empty(ListQuery.DefaultPageSize);
+    private List<Currency> _currencies = [];
+
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+    [SupplyParameterFromQuery] public bool? Desc { get; set; }
+    [SupplyParameterFromQuery] public int? Page { get; set; }
+    [SupplyParameterFromQuery] public string? Kind { get; set; }
+    [SupplyParameterFromQuery] public string? Currency { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? From { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? To { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _state = new ListState
+        {
+            Path = "operations", Q = Q, Sort = Sort, Desc = Desc == true, Page = Page ?? 1,
+            Kind = string.IsNullOrEmpty(Kind) ? null : Kind, Currency = string.IsNullOrEmpty(Currency) ? null : Currency,
+            From = From, To = To,
+        };
+        _currencies = await Directories.CurrenciesAsync();
+        var query = _state.ToQuery(PageSizeOrDefault(await Parameters.GetIntAsync("ui.page_size", ListQuery.DefaultPageSize)));
+        if (query.SortBy is null)
+        {
+            query.SortBy = "time";
+            query.Descending = true;
+        }
+
+        _result = await Operations.ListAsync(query);
+        if (_state.IsInitial)
+        {
+            await Audit.TableViewedAsync("operation", "Журнал операцій");
+        }
+    }
+}

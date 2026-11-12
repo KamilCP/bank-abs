@@ -1,0 +1,157 @@
+@page "/operations/transfer"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.TransfersMake)]
+@inherits AppPageBase
+@inject AccountRepository Accounts
+@inject OperationRepository Operations
+@inject ReportRepository Reports
+
+<PageHeader Title="Переказ між рахунками" Icon="arrow-left-right" Subtitle="Переказ коштів між поточними рахунками з автоматичною конвертацією валют за курсом банку" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+@if (_receipt is not null)
+{
+    <OperationReceipt Operation="_receipt" BankName="@_bank" BranchName="@_branch" NewOperationUrl="operations/transfer" />
+}
+else
+{
+    <form method="post" @formname="transfer" @onsubmit="SubmitAsync" class="panel" style="max-width: 860px">
+        <AntiforgeryToken />
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label required" for="from">Рахунок списання</label>
+                <input id="from" name="from" class="form-control font-monospace" list="accounts" value="@_fromNumber" autocomplete="off" required
+                       placeholder="Номер рахунку або ПІБ клієнта" />
+                @if (_from is not null)
+                {
+                    <div class="form-hint mt-1">@_from.ClientName · залишок @Fmt.Money(_from.Balance, _from.CurrencyCode)</div>
+                }
+            </div>
+            <div class="col-md-6">
+                <label class="form-label required" for="to">Рахунок зарахування</label>
+                <input id="to" name="to" class="form-control font-monospace" list="accounts" value="@_toNumber" autocomplete="off" required
+                       placeholder="Номер рахунку або ПІБ клієнта" />
+                @if (_to is not null)
+                {
+                    <div class="form-hint mt-1">@_to.ClientName · @_to.CurrencyCode</div>
+                }
+            </div>
+            <AccountDatalist Id="accounts" Accounts="_accounts" />
+            <div class="col-md-5">
+                <label class="form-label required" for="amount">Сума списання</label>
+                <div class="input-group">
+                    <input id="amount" name="amount" type="number" min="0.01" step="0.01" class="form-control text-end" value="@_amount?.ToString(CultureInfo.InvariantCulture)" required />
+                    <span class="input-group-text">@(_from?.CurrencyCode ?? "валюта")</span>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <label class="form-label" for="description">Призначення платежу</label>
+                <input id="description" name="description" class="form-control" value="@_description" maxlength="250" placeholder="Переказ коштів" />
+            </div>
+        </div>
+
+        @if (_previewAmount is not null)
+        {
+            <div class="preview mt-3">
+                <div class="fw-semibold mb-2"><i class="bi bi-calculator me-1"></i>Попередній розрахунок</div>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Буде списано</dt><dd class="col-sm-8">@Fmt.Money(_amount ?? 0, _from!.CurrencyCode)</dd>
+                    @if (_from.CurrencyCode != _to!.CurrencyCode)
+                    {
+                        <dt class="col-sm-4">Курс конвертації</dt><dd class="col-sm-8">1 @_from.CurrencyCode = @Fmt.ExchangeRate(_rate) @_to.CurrencyCode <span class="small text-secondary fw-normal">(з урахуванням маржі банку)</span></dd>
+                    }
+                    <dt class="col-sm-4">Буде зараховано</dt><dd class="col-sm-8 text-success">@Fmt.Money(_previewAmount.Value, _to.CurrencyCode)</dd>
+                    <dt class="col-sm-4">Залишок після переказу</dt><dd class="col-sm-8">@Fmt.Money(_from.Balance - (_amount ?? 0), _from.CurrencyCode)</dd>
+                </dl>
+            </div>
+        }
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" name="action" value="preview" class="btn btn-outline-primary"><i class="bi bi-calculator me-1"></i>Розрахувати</button>
+            <button type="submit" name="action" value="confirm" class="btn btn-primary" data-confirm="Виконати переказ?"><i class="bi bi-send me-1"></i>Виконати переказ</button>
+            <a class="btn btn-outline-secondary" href="">Скасувати</a>
+        </div>
+    </form>
+}
+
+@code {
+    private List<Account> _accounts = [];
+    private Account? _from;
+    private Account? _to;
+    private Operation? _receipt;
+    private string? _fromNumber;
+    private string? _toNumber;
+    private decimal? _amount;
+    private string? _description;
+    private decimal _rate;
+    private decimal? _previewAmount;
+    private string _bank = string.Empty;
+    private string _branch = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "from")] public int? FromId { get; set; }
+    [SupplyParameterFromQuery(Name = "op")] public long? OperationId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (OperationId is not null && !IsPost)
+        {
+            _receipt = await Operations.GetAsync(OperationId.Value);
+            (_bank, _branch) = await Reports.BankInfoAsync();
+            return;
+        }
+
+        _accounts = await Accounts.ListOpenCurrentAsync(null);
+        if (FromId is not null && !IsPost)
+        {
+            _from = await Accounts.GetAsync(FromId.Value);
+            _fromNumber = _from?.Number;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        var form = Form;
+        _fromNumber = form.Text("from");
+        _toNumber = form.Text("to");
+        _amount = form.Decimal("amount");
+        _description = form.Text("description");
+        _from = string.IsNullOrEmpty(_fromNumber) ? null : await Accounts.FindByNumberAsync(_fromNumber);
+        _to = string.IsNullOrEmpty(_toNumber) ? null : await Accounts.FindByNumberAsync(_toNumber);
+
+        if (_from is null)
+        {
+            Errors.Add("Оберіть рахунок списання зі списку");
+        }
+
+        if (_to is null)
+        {
+            Errors.Add("Оберіть рахунок зарахування зі списку");
+        }
+
+        if (_amount is not > 0)
+        {
+            Errors.Add("Вкажіть суму переказу більшу за нуль");
+        }
+
+        if (Errors.Count > 0)
+        {
+            return;
+        }
+
+        if (form.Text("action") != "confirm")
+        {
+            await TryAsync(async () =>
+            {
+                _rate = await Operations.ExchangeRateAsync(_from!.CurrencyCode, _to!.CurrencyCode);
+                _previewAmount = CurrencyConverter.Convert(_amount!.Value, _rate);
+            });
+            return;
+        }
+
+        long id = 0;
+        if (await TryAsync(async () => id = await Operations.TransferAsync(_from!.Id, _to!.Id, _amount!.Value, _description ?? string.Empty)))
+        {
+            RedirectWithNotice($"operations/transfer?op={id}", "transfer-done");
+        }
+    }
+}

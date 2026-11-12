@@ -1,0 +1,120 @@
+@page "/accounts/{Id:int}"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.AccountsView)]
+@inherits AppPageBase
+@inject AccountRepository Accounts
+@inject OperationRepository Operations
+@inject ParameterRepository Parameters
+
+@if (_account is null)
+{
+    <PageHeader Title="Рахунок не знайдено" Icon="wallet2" ParentTitle="Рахунки" ParentHref="accounts" />
+}
+else
+{
+    <PageHeader Title="@Fmt.Iban(_account.Number)" Icon="wallet2" ParentTitle="Рахунки" ParentHref="accounts"
+                Subtitle="@($"{AccountTypes.Title(_account.AccountType)} рахунок · {_account.ClientName}")">
+        @if (_account.IsOpen && _account.AccountType == AccountTypes.Current && CurrentUser.Can(Permissions.CashOperate))
+        {
+            <a class="btn btn-outline-primary" href="operations/cash?account=@Id"><i class="bi bi-cash-coin me-1"></i>Касова операція</a>
+        }
+        @if (_account.IsOpen && _account.AccountType == AccountTypes.Current && CurrentUser.Can(Permissions.TransfersMake))
+        {
+            <a class="btn btn-outline-primary" href="operations/transfer?from=@Id"><i class="bi bi-arrow-left-right me-1"></i>Переказ</a>
+        }
+        @if (_account.AccountType != AccountTypes.Credit && CurrentUser.Can(Permissions.ReportsView))
+        {
+            <a class="btn btn-outline-secondary" href="reports/statement?account=@Id"><i class="bi bi-file-earmark-text me-1"></i>Виписка</a>
+        }
+        @if (_account.IsOpen && _account.AccountType == AccountTypes.Current && CurrentUser.Can(Permissions.AccountsManage))
+        {
+            <form method="post" @formname="close" @onsubmit="CloseAsync" class="d-inline">
+                <AntiforgeryToken />
+                <button class="btn btn-outline-danger" data-confirm="Закрити рахунок? Закрити можна лише рахунок з нульовим залишком."><i class="bi bi-lock me-1"></i>Закрити рахунок</button>
+            </form>
+        }
+    </PageHeader>
+
+    <AlertMessage Errors="Errors" Success="@SuccessText" />
+
+    <div class="kpi-grid">
+        <KpiCard Title="@(_account.AccountType == AccountTypes.Credit ? "Заборгованість" : "Залишок")" Value="@Fmt.Money(_account.Balance, _account.CurrencyCode)" Icon="cash-stack" Tone="green" />
+        <KpiCard Title="Еквівалент у гривні" Value="@Fmt.MoneyShort(_account.BalanceBase)" Icon="currency-exchange" />
+        <KpiCard Title="Відкрито" Value="@Fmt.Date(_account.OpenedAt)" Icon="calendar-check" Tone="violet" Note="@(_account.ClosedAt is null ? null : "закрито " + Fmt.Date(_account.ClosedAt))" />
+        <div class="kpi-card"><div class="kpi-icon kpi-blue"><i class="bi bi-flag"></i></div><div><div class="kpi-title">Стан</div><div class="mt-1"><StatusBadge Kind="account" Value="@_account.Status" /></div></div></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title"><i class="bi bi-journal-text"></i>Операції за рахунком</div>
+        <form method="get" action="accounts/@Id" class="filter-bar">
+            <label class="small text-secondary" for="from">Період з</label>
+            <input id="from" type="date" name="from" class="form-control" value="@From?.ToString("yyyy-MM-dd")" />
+            <label class="small text-secondary" for="to">по</label>
+            <input id="to" type="date" name="to" class="form-control" value="@To?.ToString("yyyy-MM-dd")" />
+            <FilterButtons ResetUrl="@($"accounts/{Id}")" />
+        </form>
+        <div class="table-wrap">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr><SortLink Column="time" Title="Час" State="_state" /><th>№</th><SortLink Column="type" Title="Операція" State="_state" /><th>Кореспондент</th><th>Призначення</th><th class="num">Списання</th><th class="num">Зарахування</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var op in _operations.Items)
+                    {
+                        var outgoing = op.FromNumber == _account.Number;
+                        <tr>
+                            <td class="text-nowrap small">@Fmt.DateTime(op.OpTime)</td>
+                            <td class="text-secondary small">@op.Id</td>
+                            <td><span class="badge badge-type">@OperationTypes.Title(op.OpType)</span></td>
+                            <td class="small">@(outgoing ? op.ToClient ?? "—" : op.FromClient ?? "—")</td>
+                            <td class="small">@op.Description</td>
+                            <td class="num amount-out">@(outgoing ? Fmt.Money(op.Amount) : "")</td>
+                            <td class="num amount-in">@(!outgoing ? Fmt.Money(op.AmountTo ?? op.Amount) : "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pager Result="_operations" State="_state" />
+    </div>
+}
+
+@code {
+    private Account? _account;
+    private ListState _state = new();
+    private PagedResult<Operation> _operations = PagedResult<Operation>.Empty(ListQuery.DefaultPageSize);
+
+    [Parameter] public int Id { get; set; }
+    [SupplyParameterFromQuery] public string? Sort { get; set; }
+    [SupplyParameterFromQuery] public bool? Desc { get; set; }
+    [SupplyParameterFromQuery] public int? Page { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? From { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? To { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _account = await Accounts.GetAsync(Id);
+        if (_account is null)
+        {
+            return;
+        }
+
+        _state = new ListState { Path = $"accounts/{Id}", Sort = Sort, Desc = Desc == true, Page = Page ?? 1, From = From, To = To };
+        var query = _state.ToQuery(PageSizeOrDefault(await Parameters.GetIntAsync("ui.page_size", ListQuery.DefaultPageSize)));
+        query.OwnerId = Id;
+        if (query.SortBy is null)
+        {
+            query.SortBy = "time";
+            query.Descending = true;
+        }
+
+        _operations = await Operations.ListAsync(query);
+    }
+
+    private async Task CloseAsync()
+    {
+        if (CurrentUser.Can(Permissions.AccountsManage) && await TryAsync(() => Accounts.CloseAsync(Id)))
+        {
+            RedirectWithNotice($"accounts/{Id}", "account-closed");
+        }
+    }
+}

@@ -1,0 +1,122 @@
+@page "/operations/cash"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.CashOperate)]
+@inherits AppPageBase
+@inject AccountRepository Accounts
+@inject OperationRepository Operations
+@inject ReportRepository Reports
+
+<PageHeader Title="Каса" Icon="cash-coin" Subtitle="Внесення і видача готівки за поточними рахунками" />
+
+<AlertMessage Errors="Errors" Success="@SuccessText" />
+
+@if (_receipt is not null)
+{
+    <OperationReceipt Operation="_receipt" BankName="@_bank" BranchName="@_branch" NewOperationUrl="operations/cash" />
+}
+else
+{
+    <form method="post" @formname="cash" @onsubmit="SubmitAsync" class="panel" style="max-width: 760px">
+        <AntiforgeryToken />
+        <div class="row g-3">
+            <div class="col-12">
+                <span class="form-label required d-block">Операція</span>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="type" id="type-in" value="in" checked="@(_type == "in")" />
+                    <label class="btn btn-outline-success" for="type-in"><i class="bi bi-box-arrow-in-down me-1"></i>Внесення готівки</label>
+                    <input type="radio" class="btn-check" name="type" id="type-out" value="out" checked="@(_type == "out")" />
+                    <label class="btn btn-outline-danger" for="type-out"><i class="bi bi-box-arrow-up me-1"></i>Видача готівки</label>
+                </div>
+            </div>
+            <div class="col-12">
+                <label class="form-label required" for="account">Поточний рахунок</label>
+                <input id="account" name="account" class="form-control font-monospace" list="accounts" value="@_accountNumber"
+                       placeholder="Почніть вводити номер рахунку або ПІБ клієнта" autocomplete="off" required />
+                <AccountDatalist Id="accounts" Accounts="_accounts" />
+                @if (_selected is not null)
+                {
+                    <div class="form-hint mt-1">@_selected.ClientName · залишок @Fmt.Money(_selected.Balance, _selected.CurrencyCode)</div>
+                }
+            </div>
+            <div class="col-md-5">
+                <label class="form-label required" for="amount">Сума</label>
+                <div class="input-group">
+                    <input id="amount" name="amount" type="number" min="0.01" step="0.01" class="form-control text-end" value="@_amount?.ToString(CultureInfo.InvariantCulture)" required />
+                    <span class="input-group-text">@(_selected?.CurrencyCode ?? "валюта рахунку")</span>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <label class="form-label" for="description">Призначення</label>
+                <input id="description" name="description" class="form-control" value="@_description" maxlength="250" placeholder="Внесення / видача готівки" />
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary" data-confirm="Провести касову операцію?"><i class="bi bi-check2-circle me-1"></i>Провести операцію</button>
+            <a class="btn btn-outline-secondary" href="">Скасувати</a>
+        </div>
+    </form>
+}
+
+@code {
+    private List<Account> _accounts = [];
+    private Account? _selected;
+    private Operation? _receipt;
+    private string _type = "in";
+    private string? _accountNumber;
+    private decimal? _amount;
+    private string? _description;
+    private string _bank = string.Empty;
+    private string _branch = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "account")] public int? AccountId { get; set; }
+    [SupplyParameterFromQuery(Name = "op")] public long? OperationId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (OperationId is not null && !IsPost)
+        {
+            _receipt = await Operations.GetAsync(OperationId.Value);
+            (_bank, _branch) = await Reports.BankInfoAsync();
+            return;
+        }
+
+        _accounts = await Accounts.ListOpenCurrentAsync(null);
+        if (AccountId is not null && !IsPost)
+        {
+            _selected = await Accounts.GetAsync(AccountId.Value);
+            _accountNumber = _selected?.Number;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        var form = Form;
+        _type = form.Text("type") == "out" ? "out" : "in";
+        _accountNumber = form.Text("account");
+        _amount = form.Decimal("amount");
+        _description = form.Text("description");
+        _selected = string.IsNullOrEmpty(_accountNumber) ? null : await Accounts.FindByNumberAsync(_accountNumber);
+
+        if (_selected is null)
+        {
+            Errors.Add("Оберіть поточний рахунок зі списку (номер IBAN)");
+        }
+
+        if (_amount is not > 0)
+        {
+            Errors.Add("Вкажіть суму операції більшу за нуль");
+        }
+
+        if (Errors.Count > 0)
+        {
+            return;
+        }
+
+        long id = 0;
+        if (await TryAsync(async () => id = _type == "in"
+                ? await Operations.CashInAsync(_selected!.Id, _amount!.Value, _description ?? string.Empty)
+                : await Operations.CashOutAsync(_selected!.Id, _amount!.Value, _description ?? string.Empty)))
+        {
+            RedirectWithNotice($"operations/cash?op={id}", "cash-done");
+        }
+    }
+}
