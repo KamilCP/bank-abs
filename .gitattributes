@@ -1,0 +1,5 @@
+# Нормалізація кінців рядків: у репозиторії LF, у робочій копії Windows — CRLF
+* text=auto
+*.png binary
+*.woff binary
+*.woff2 binary

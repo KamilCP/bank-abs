@@ -1,0 +1,110 @@
+# =============================================================================
+# Bank ABS — правила оформлення коду (стандарт кодування, docs/CODING_STANDARD.md)
+# Правила з рівнем warning перевіряються під час збирання (EnforceCodeStyleInBuild)
+# і, оскільки TreatWarningsAsErrors = true, порушення зупиняє збирання.
+# =============================================================================
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,props,targets,csproj,slnx,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.sql]
+indent_size = 4
+
+[*.{cs,razor}]
+max_line_length = 130
+
+[*.cs]
+# --- Простори імен, using, var ---
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# --- Фігурні дужки (стиль Allman: кожна дужка з нового рядка) і обов'язкові блоки ---
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0011.severity = warning
+
+# --- Пробіли ---
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_around_binary_operators = before_and_after
+csharp_space_after_cast = false
+csharp_space_after_comma = true
+csharp_space_before_open_square_brackets = false
+
+# --- Модифікатори доступу завжди вказуються явно ---
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_diagnostic.IDE0040.severity = warning
+
+# --- Іменування ---
+# Типи, методи, властивості, події, константи — PascalCase
+dotnet_naming_symbols.types_and_members.applicable_kinds = class, struct, interface, enum, delegate, method, property, event
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+dotnet_naming_rule.types_and_members_pascal.symbols = types_and_members
+dotnet_naming_rule.types_and_members_pascal.style = pascal_case
+dotnet_naming_rule.types_and_members_pascal.severity = warning
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_rule.constants_pascal.symbols = constants
+dotnet_naming_rule.constants_pascal.style = pascal_case
+dotnet_naming_rule.constants_pascal.severity = warning
+
+# Інтерфейси — з префіксом I
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefix_i.required_prefix = I
+dotnet_naming_style.prefix_i.capitalization = pascal_case
+dotnet_naming_rule.interfaces_prefix_i.symbols = interfaces
+dotnet_naming_rule.interfaces_prefix_i.style = prefix_i
+dotnet_naming_rule.interfaces_prefix_i.severity = warning
+
+# Закриті поля — _camelCase; статичні readonly — PascalCase
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.applicable_accessibilities = private
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static, readonly
+dotnet_naming_rule.static_readonly_pascal.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_pascal.style = pascal_case
+dotnet_naming_rule.static_readonly_pascal.severity = warning
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = warning
+
+# Параметри і локальні змінні — camelCase
+dotnet_naming_symbols.locals_and_parameters.applicable_kinds = parameter, local
+dotnet_naming_style.camel_case.capitalization = camel_case
+dotnet_naming_rule.locals_camel.symbols = locals_and_parameters
+dotnet_naming_rule.locals_camel.style = camel_case
+dotnet_naming_rule.locals_camel.severity = warning
+dotnet_diagnostic.IDE1006.severity = warning
+
+# --- Якість коду ---
+dotnet_style_readonly_field = true:warning
+dotnet_diagnostic.IDE0044.severity = warning
+dotnet_style_prefer_conditional_expression_over_return = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+dotnet_diagnostic.CA1822.severity = suggestion
+dotnet_diagnostic.CA2007.severity = none
+
+# Тести: назви методів «Метод_Умова_Очікування» містять підкреслення
+[tests/**/*.cs]
+dotnet_naming_rule.types_and_members_pascal.severity = none

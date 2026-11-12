@@ -1,0 +1,28 @@
+<Solution>
+  <Folder Name="/db/">
+    <File Path="db/01_schema.sql" />
+    <File Path="db/02_functions.sql" />
+    <File Path="db/03_triggers.sql" />
+    <File Path="db/04_seed.sql" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/BUILD.md" />
+    <File Path="docs/CODING_STANDARD.md" />
+    <File Path="docs/UI_STANDARD.md" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+    <File Path=".github/workflows/build.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/BankAbs.Domain/BankAbs.Domain.csproj" />
+    <Project Path="src/BankAbs.Data/BankAbs.Data.csproj" />
+    <Project Path="src/BankAbs.Web/BankAbs.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BankAbs.Tests/BankAbs.Tests.csproj" />
+  </Folder>
+</Solution>

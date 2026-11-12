@@ -1,0 +1,68 @@
+# Bank ABS — безперервна інтеграція: збирання з номером збірки, тести (у т. ч. з PostgreSQL), публікація
+name: build
+
+on:
+  push:
+    branches: [ main, develop, 'release/**', 'feature/**', 'hotfix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bank_abs_test
+        ports: [ '5432:5432' ]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+      BANKABS_TEST_CONNECTION: Host=localhost;Port=5432;Database=bank_abs_test;Username=postgres;Password=postgres
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Створення тестової БД зі скриптів db/*.sql
+        run: cat db/01_schema.sql db/02_functions.sql db/03_triggers.sql db/04_seed.sql | psql -v ON_ERROR_STOP=1 -1 -q -f -
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: bank_abs_test
+
+      - name: Відновлення пакетів
+        run: dotnet restore BankAbs.slnx
+
+      - name: Збирання (номер збірки ${{ github.run_number }})
+        run: dotnet build BankAbs.slnx -c Release --no-restore -p:BuildNumber=$BUILD_NUMBER
+
+      - name: Модульні та інтеграційні тести
+        run: dotnet test BankAbs.slnx -c Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Публікація веб-застосунку
+        run: dotnet publish src/BankAbs.Web -c Release --no-build -o publish -p:BuildNumber=$BUILD_NUMBER
+
+      - name: Артефакт збірки
+        uses: actions/upload-artifact@v4
+        with:
+          name: BankAbs-build-${{ github.run_number }}
+          path: publish/
+
+      - name: Результати тестів
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_number }}
+          path: TestResults/

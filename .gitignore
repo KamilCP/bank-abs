@@ -1,0 +1,14 @@
+# Збирання
+bin/
+obj/
+artifacts/
+publish/
+TestResults/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+*.swp
+# Секрети (рядок підключення зберігається в User Secrets, не в репозиторії)
+appsettings.*.local.json

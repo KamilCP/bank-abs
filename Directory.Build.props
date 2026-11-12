@@ -1,0 +1,50 @@
+<Project>
+  <!--
+    Спільні налаштування збирання для всіх проєктів рішення Bank ABS.
+    Нумерація версій: семантичне версіонування MAJOR.MINOR.PATCH[-суфікс]+build.N.commit
+      VersionPrefix  — номер версії продукту (змінюється при випуску версії, див. план релізів ЛР № 3);
+      VersionSuffix  — стадія (beta.1, rc.1; порожньо для промислової версії);
+      BuildNumber    — номер збірки; на CI передається як -p:BuildNumber=${{ github.run_number }},
+                       локально дорівнює 0;
+      GitCommit      — короткий хеш коміту, з якого зібрано програму.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <WarningsNotAsErrors>CS1591</WarningsNotAsErrors>
+
+    <Product>Bank ABS — автоматизована система діяльності банку</Product>
+    <Company>Фаховий коледж «КАІ ТЕХ» НАУ</Company>
+    <Authors>Сабіржанов К. Р.</Authors>
+    <Copyright>© 2026 Сабіржанов К. Р., група 581-ІПЗ</Copyright>
+    <NeutralLanguage>uk-UA</NeutralLanguage>
+
+    <VersionPrefix>0.2.0</VersionPrefix>
+    <VersionSuffix>beta.1</VersionSuffix>
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).$(BuildNumber)</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <!-- Повний номер версії з номером збірки і хешем коміту для форми «Про програму» -->
+  <Target Name="BankAbsVersionInfo" BeforeTargets="GetAssemblyAttributes">
+    <Exec Command="git rev-parse --short=7 HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true"
+          StandardOutputImportance="low" StandardErrorImportance="low" EchoOff="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommit" />
+    </Exec>
+    <PropertyGroup>
+      <GitCommit Condition="'$(GitCommit.Length)' != '7'">local</GitCommit>
+      <InformationalVersion Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)+build.$(BuildNumber).$(GitCommit)</InformationalVersion>
+      <InformationalVersion Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)+build.$(BuildNumber).$(GitCommit)</InformationalVersion>
+    </PropertyGroup>
+    <ItemGroup>
+      <AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))" />
+      <AssemblyMetadata Include="BuildNumber" Value="$(BuildNumber)" />
+    </ItemGroup>
+  </Target>
+</Project>
