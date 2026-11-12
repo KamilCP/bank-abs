@@ -1,0 +1,52 @@
+@page "/about"
+@attribute [Authorize]
+@inherits AppPageBase
+@inject ParameterRepository Parameters
+
+<PageHeader Title="Про програму" Icon="info-circle" />
+
+<div class="panel" style="max-width: 820px">
+    <div class="d-flex gap-3 align-items-center mb-3">
+        <img src="favicon.svg" alt="" width="64" height="64" />
+        <div>
+            <div class="h4 mb-0 fw-bold">Bank ABS</div>
+            <div class="text-secondary">@AppInfo.Product</div>
+        </div>
+    </div>
+    <table class="table table-sm mb-0">
+        <tbody>
+            <tr><th class="w-25 fw-normal text-secondary">Версія</th><td class="fw-semibold">@AppInfo.Version</td></tr>
+            <tr><th class="fw-normal text-secondary">Повний номер збірки</th><td class="font-monospace">@AppInfo.InformationalVersion</td></tr>
+            <tr><th class="fw-normal text-secondary">Версія файлу</th><td class="font-monospace">@AppInfo.FileVersion</td></tr>
+            <tr><th class="fw-normal text-secondary">Номер збірки</th><td>@AppInfo.BuildNumber</td></tr>
+            <tr><th class="fw-normal text-secondary">Коміт</th><td class="font-monospace">@AppInfo.Commit</td></tr>
+            <tr><th class="fw-normal text-secondary">Дата збирання</th><td>@Fmt.DateTime(AppInfo.BuildDate)</td></tr>
+            <tr><th class="fw-normal text-secondary">Середовище виконання</th><td>@AppInfo.Runtime</td></tr>
+            <tr><th class="fw-normal text-secondary">Сервер БД</th><td>PostgreSQL @_dbVersion · база <span class="font-monospace">@_dbName</span></td></tr>
+            <tr><th class="fw-normal text-secondary">Розробник</th><td>Сабіржанов Камільжан Рустамжанович, група 581-ІПЗ</td></tr>
+            <tr><th class="fw-normal text-secondary">Організація</th><td>@AppInfo.Company</td></tr>
+            <tr><th class="fw-normal text-secondary">Дисципліна</th><td>Конструювання програмного забезпечення (викладач В. В. Ткаченко)</td></tr>
+            <tr><th class="fw-normal text-secondary">Авторські права</th><td>@AppInfo.Copyright</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="panel" style="max-width: 820px">
+    <div class="panel-title"><i class="bi bi-boxes"></i>Використані компоненти</div>
+    <ul class="small mb-0">
+        <li>.NET 10, ASP.NET Core Blazor — Microsoft, ліцензія MIT</li>
+        <li>Npgsql — постачальник даних PostgreSQL, ліцензія PostgreSQL</li>
+        <li>Bootstrap 5.3 і Bootstrap Icons 1.11 — ліцензія MIT</li>
+        <li>PostgreSQL — ліцензія PostgreSQL</li>
+    </ul>
+</div>
+
+@code {
+    private string _dbVersion = string.Empty;
+    private string _dbName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        (_dbVersion, _dbName) = await Parameters.ServerInfoAsync();
+    }
+}
