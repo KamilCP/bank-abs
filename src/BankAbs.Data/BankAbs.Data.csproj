@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Доступ до даних: репозиторії на ADO.NET (System.Data.Common), SQL-скрипти створення БД.
+       Конкретний постачальник (Npgsql) підключається у BankAbs.Web через DbDataSource. -->
+  <PropertyGroup>
+    <RootNamespace>BankAbs.Data</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BankAbs.Domain\BankAbs.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Скрипти БД вбудовуються в збірку і виконуються DatabaseInitializer під час першого запуску -->
+    <EmbeddedResource Include="..\..\db\*.sql" LogicalName="BankAbs.Data.Sql.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
