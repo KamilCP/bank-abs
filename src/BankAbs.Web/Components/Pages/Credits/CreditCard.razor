@@ -1,0 +1,113 @@
+@page "/credits/{Id:int}"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.CreditsView)]
+@inherits AppPageBase
+@inject CreditRepository Credits
+
+@if (_credit is null)
+{
+    <PageHeader Title="Кредит не знайдено" Icon="credit-card-2-front" ParentTitle="Кредити" ParentHref="credits" />
+}
+else
+{
+    <PageHeader Title="@($"Кредит № {_credit.Id}")" Icon="credit-card-2-front" ParentTitle="Кредити" ParentHref="credits"
+                Subtitle="@($"{_credit.ProductName} · {_credit.ClientName}")">
+        @if (CurrentUser.Can(Permissions.ReportsView))
+        {
+            <a class="btn btn-outline-secondary" href="reports/credit-schedule/@Id"><i class="bi bi-printer me-1"></i>Графік для друку</a>
+        }
+        @if (_credit.Status != CreditStatuses.Repaid && _next is not null && CurrentUser.Can(Permissions.CreditsManage))
+        {
+            <form method="post" @formname="pay" @onsubmit="PayAsync" class="d-inline">
+                <AntiforgeryToken />
+                <button class="btn btn-primary" data-confirm="@($"Списати платіж № {_next.Number} у сумі {Fmt.Money(_next.Payment, _credit.CurrencyCode)} з поточного рахунку клієнта?")"><i class="bi bi-cash-coin me-1"></i>Сплатити платіж № @_next.Number</button>
+            </form>
+        }
+    </PageHeader>
+
+    <AlertMessage Errors="Errors" Success="@SuccessText" />
+
+    <div class="kpi-grid">
+        <KpiCard Title="Залишок боргу" Value="@Fmt.Money(_credit.Debt, _credit.CurrencyCode)" Icon="cash-stack" Tone="orange" Note="@($"видано {Fmt.Money(_credit.Amount)}")" />
+        <KpiCard Title="Щомісячний платіж" Value="@Fmt.Money(_credit.MonthlyPayment, _credit.CurrencyCode)" Icon="calendar-check" Note="@($"ставка {Fmt.Rate(_credit.AnnualRate)}")" />
+        <KpiCard Title="Сплачено платежів" Value="@($"{_credit.PaidCount} з {_credit.TermMonths}")" Icon="check2-all" Tone="green" />
+        <KpiCard Title="Наступний платіж" Value="@Fmt.Date(_credit.NextDueDate)" Icon="alarm" Tone="@(_credit.Status == CreditStatuses.Overdue ? "red" : "violet")" Note="@CreditStatuses.Title(_credit.Status)" />
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-4">
+            <div class="panel">
+                <div class="panel-title"><i class="bi bi-file-text"></i>Договір</div>
+                <dl class="row small mb-0">
+                    <dt class="col-5">Клієнт</dt><dd class="col-7"><a href="clients/@_credit.ClientId">@_credit.ClientName</a></dd>
+                    <dt class="col-5">Кредитний рахунок</dt><dd class="col-7 font-monospace">@Fmt.Iban(_credit.AccountNumber)</dd>
+                    <dt class="col-5">Поточний рахунок</dt><dd class="col-7"><a class="font-monospace" href="accounts/@_credit.CurrentAccountId">@Fmt.Iban(_credit.CurrentNumber)</a></dd>
+                    <dt class="col-5">Дата видачі</dt><dd class="col-7">@Fmt.Date(_credit.IssueDate)</dd>
+                    <dt class="col-5">Строк</dt><dd class="col-7">@_credit.TermMonths міс.</dd>
+                    <dt class="col-5">Переплата</dt><dd class="col-7">@Fmt.Money(_schedule.Sum(s => s.Interest), _credit.CurrencyCode)</dd>
+                    <dt class="col-5">Стан</dt><dd class="col-7"><StatusBadge Kind="credit" Value="@_credit.Status" /></dd>
+                </dl>
+            </div>
+        </div>
+        <div class="col-xl-8">
+            <div class="panel">
+                <div class="panel-title"><i class="bi bi-calendar3"></i>Графік погашення</div>
+                <div class="table-wrap">
+                    <table class="table table-sm">
+                        <thead><tr><th>№</th><th>Дата платежу</th><th class="num">Платіж</th><th class="num">Тіло</th><th class="num">Відсотки</th><th class="num">Залишок</th><th>Сплачено</th></tr></thead>
+                        <tbody>
+                            @foreach (var row in _schedule)
+                            {
+                                var overdue = row.PaidAt is null && row.DueDate < Fmt.Today;
+                                <tr class="@(overdue ? "table-danger" : row.PaidAt is not null ? "text-secondary" : "")">
+                                    <td>@row.Number</td>
+                                    <td>@Fmt.Date(row.DueDate)</td>
+                                    <td class="num fw-semibold">@Fmt.Money(row.Payment)</td>
+                                    <td class="num">@Fmt.Money(row.Principal)</td>
+                                    <td class="num">@Fmt.Money(row.Interest)</td>
+                                    <td class="num">@Fmt.Money(row.BalanceAfter)</td>
+                                    <td class="small">
+                                        @if (row.PaidAt is not null)
+                                        {
+                                            <i class="bi bi-check-circle-fill text-success me-1"></i>@Fmt.DateTime(row.PaidAt)
+                                        }
+                                        else if (overdue)
+                                        {
+                                            <span class="text-danger fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>прострочено</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot><tr><td colspan="2">Разом</td><td class="num">@Fmt.Money(_schedule.Sum(s => s.Payment))</td><td class="num">@Fmt.Money(_schedule.Sum(s => s.Principal))</td><td class="num">@Fmt.Money(_schedule.Sum(s => s.Interest))</td><td colspan="2"></td></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Credit? _credit;
+    private List<CreditScheduleItem> _schedule = [];
+    private CreditScheduleItem? _next;
+
+    [Parameter] public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _credit = await Credits.GetAsync(Id);
+        if (_credit is not null)
+        {
+            _schedule = await Credits.ScheduleAsync(Id);
+            _next = _schedule.FirstOrDefault(s => s.PaidAt is null);
+        }
+    }
+
+    private async Task PayAsync()
+    {
+        if (CurrentUser.Can(Permissions.CreditsManage) && await TryAsync(() => Credits.PayAsync(Id)))
+        {
+            RedirectWithNotice($"credits/{Id}", "credit-paid");
+        }
+    }
+}
