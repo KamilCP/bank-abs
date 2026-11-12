@@ -1,0 +1,242 @@
+@page "/clients/{Id:int}"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ClientsView)]
+@inherits AppPageBase
+@inject ClientRepository Clients
+@inject AccountRepository Accounts
+@inject DepositRepository Deposits
+@inject CreditRepository Credits
+@inject DirectoryRepository Directories
+
+@if (_client is null)
+{
+    <PageHeader Title="Клієнта не знайдено" Icon="person-x" ParentTitle="Клієнти" ParentHref="clients" />
+}
+else
+{
+    <PageHeader Title="@_client.FullName" Icon="@(_client.ClientType == ClientTypes.Person ? "person-vcard" : "building")"
+                ParentTitle="Клієнти" ParentHref="clients" Subtitle="@($"{ClientTypes.Title(_client.ClientType)} · код {_client.TaxId}")">
+        @if (CurrentUser.Can(Permissions.ClientsEdit))
+        {
+            <a class="btn btn-outline-primary" href="clients/@Id/edit"><i class="bi bi-pencil me-1"></i>Редагувати</a>
+            <form method="post" @formname="status" @onsubmit="ToggleStatusAsync" class="d-inline">
+                <AntiforgeryToken />
+                @if (_client.Status == ClientStatuses.Active)
+                {
+                    <button class="btn btn-outline-danger" data-confirm="Заблокувати клієнта? Операції за його рахунками будуть заборонені."><i class="bi bi-slash-circle me-1"></i>Заблокувати</button>
+                }
+                else
+                {
+                    <button class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Розблокувати</button>
+                }
+            </form>
+        }
+    </PageHeader>
+
+    <AlertMessage Errors="Errors" Success="@SuccessText" />
+
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="panel h-100">
+                <div class="panel-title"><i class="bi bi-person-lines-fill"></i>Картка клієнта</div>
+                <dl class="row small mb-0">
+                    <dt class="col-5">Стан</dt><dd class="col-7"><StatusBadge Kind="client" Value="@_client.Status" /></dd>
+                    @if (_client.ClientType == ClientTypes.Person)
+                    {
+                        <dt class="col-5">Дата народження</dt><dd class="col-7">@Fmt.Date(_client.BirthDate)</dd>
+                    }
+                    <dt class="col-5">Документ</dt><dd class="col-7">@(_client.Document.Length > 0 ? _client.Document : "—")</dd>
+                    <dt class="col-5">Телефон</dt><dd class="col-7">@(_client.Phone.Length > 0 ? _client.Phone : "—")</dd>
+                    <dt class="col-5">E-mail</dt><dd class="col-7 text-break">@(_client.Email.Length > 0 ? _client.Email : "—")</dd>
+                    <dt class="col-5">Адреса</dt><dd class="col-7">@(_client.Address.Length > 0 ? _client.Address : "—")</dd>
+                    <dt class="col-5">Зареєстровано</dt><dd class="col-7">@Fmt.DateTime(_client.CreatedAt)</dd>
+                    <dt class="col-5">Кошти</dt><dd class="col-7 fw-semibold">@Fmt.Money(_client.TotalBalanceBase, "UAH")</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="panel h-100">
+                <div class="panel-title"><i class="bi bi-wallet2"></i>Рахунки</div>
+                <div class="table-wrap">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>Номер</th><th>Тип</th><th>Валюта</th><th class="num">Залишок</th><th>Відкрито</th><th>Стан</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var account in _accounts)
+                            {
+                                <tr>
+                                    <td><a class="font-monospace" href="accounts/@account.Id">@Fmt.Iban(account.Number)</a></td>
+                                    <td class="small">@AccountTypes.Title(account.AccountType)</td>
+                                    <td>@account.CurrencyCode</td>
+                                    <td class="num fw-semibold">@Fmt.Money(account.Balance)</td>
+                                    <td class="small">@Fmt.Date(account.OpenedAt)</td>
+                                    <td><StatusBadge Kind="account" Value="@account.Status" /></td>
+                                    <td class="text-end text-nowrap">
+                                        @if (account.IsOpen && account.AccountType != AccountTypes.Credit && CurrentUser.Can(Permissions.ReportsView))
+                                        {
+                                            <a class="btn btn-sm btn-link py-0" href="reports/statement?account=@account.Id" title="Виписка"><i class="bi bi-file-earmark-text"></i></a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (_client.Status == ClientStatuses.Active && CurrentUser.Can(Permissions.AccountsManage))
+                {
+                    <form method="post" @formname="open-account" @onsubmit="OpenAccountAsync" class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                        <AntiforgeryToken />
+                        <span class="small text-secondary">Відкрити поточний рахунок у валюті</span>
+                        <select name="currency" class="form-select form-select-sm w-auto" aria-label="Валюта рахунку">
+                            @foreach (var currency in _currencies)
+                            {
+                                <option value="@currency.Code">@currency.Code — @currency.Name</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Відкрити рахунок</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-0">
+        @if (CurrentUser.Can(Permissions.DepositsView))
+        {
+            <div class="col-lg-6">
+                <div class="panel h-100">
+                    <div class="panel-title"><i class="bi bi-piggy-bank"></i>Депозити
+                        @if (_client.Status == ClientStatuses.Active && CurrentUser.Can(Permissions.DepositsManage))
+                        {
+                            <a class="btn btn-sm btn-outline-primary ms-auto" href="deposits/new?client=@Id"><i class="bi bi-plus-lg me-1"></i>Розмістити вклад</a>
+                        }
+                    </div>
+                    @if (_deposits.Count == 0)
+                    {
+                        <p class="small text-secondary mb-0">Вкладів немає.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm">
+                            <thead><tr><th>№</th><th>Продукт</th><th class="num">Сума</th><th>До</th><th>Стан</th></tr></thead>
+                            <tbody>
+                                @foreach (var deposit in _deposits)
+                                {
+                                    <tr>
+                                        <td><a href="deposits/@deposit.Id">@deposit.Id</a></td>
+                                        <td class="small">@deposit.ProductName</td>
+                                        <td class="num">@Fmt.Money(deposit.CurrentAmount, deposit.CurrencyCode)</td>
+                                        <td class="small">@Fmt.Date(deposit.EndDate)</td>
+                                        <td><StatusBadge Kind="deposit" Value="@deposit.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        }
+        @if (CurrentUser.Can(Permissions.CreditsView))
+        {
+            <div class="col-lg-6">
+                <div class="panel h-100">
+                    <div class="panel-title"><i class="bi bi-credit-card-2-front"></i>Кредити
+                        @if (_client.Status == ClientStatuses.Active && CurrentUser.Can(Permissions.CreditsManage))
+                        {
+                            <a class="btn btn-sm btn-outline-primary ms-auto" href="credits/new?client=@Id"><i class="bi bi-plus-lg me-1"></i>Видати кредит</a>
+                        }
+                    </div>
+                    @if (_credits.Count == 0)
+                    {
+                        <p class="small text-secondary mb-0">Кредитів немає.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm">
+                            <thead><tr><th>№</th><th>Продукт</th><th class="num">Борг</th><th>Платіж</th><th>Стан</th></tr></thead>
+                            <tbody>
+                                @foreach (var credit in _credits)
+                                {
+                                    <tr>
+                                        <td><a href="credits/@credit.Id">@credit.Id</a></td>
+                                        <td class="small">@credit.ProductName</td>
+                                        <td class="num">@Fmt.Money(credit.Debt, credit.CurrencyCode)</td>
+                                        <td class="small">@Fmt.Date(credit.NextDueDate)</td>
+                                        <td><StatusBadge Kind="credit" Value="@credit.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private Client? _client;
+    private List<Account> _accounts = [];
+    private List<Deposit> _deposits = [];
+    private List<Credit> _credits = [];
+    private List<Currency> _currencies = [];
+
+    [Parameter] public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _client = await Clients.GetAsync(Id);
+        if (_client is null)
+        {
+            return;
+        }
+
+        _accounts = await Accounts.ListByClientAsync(Id);
+        _currencies = await Directories.CurrenciesAsync();
+        if (CurrentUser.Can(Permissions.DepositsView))
+        {
+            _deposits = [.. (await Deposits.ListAsync(new ListQuery { OwnerId = Id, PageSize = 50 })).Items];
+        }
+
+        if (CurrentUser.Can(Permissions.CreditsView))
+        {
+            _credits = [.. (await Credits.ListAsync(new ListQuery { OwnerId = Id, PageSize = 50 })).Items];
+        }
+    }
+
+    private async Task ToggleStatusAsync()
+    {
+        if (_client is null || !CurrentUser.Can(Permissions.ClientsEdit))
+        {
+            return;
+        }
+
+        var blocking = _client.Status == ClientStatuses.Active;
+        if (await TryAsync(() => Clients.SetStatusAsync(Id, blocking ? ClientStatuses.Blocked : ClientStatuses.Active)))
+        {
+            RedirectWithNotice($"clients/{Id}", blocking ? "client-blocked" : "client-unblocked");
+        }
+    }
+
+    private async Task OpenAccountAsync()
+    {
+        if (!CurrentUser.Can(Permissions.AccountsManage))
+        {
+            return;
+        }
+
+        var currency = Form.Text("currency");
+        var accountId = 0;
+        if (await TryAsync(async () => accountId = await Accounts.OpenAsync(Id, currency)))
+        {
+            RedirectWithNotice($"accounts/{accountId}", "account-opened");
+        }
+        else
+        {
+            await LoadAsync();
+        }
+    }
+}

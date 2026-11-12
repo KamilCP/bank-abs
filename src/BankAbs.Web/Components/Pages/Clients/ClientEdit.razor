@@ -1,0 +1,116 @@
+@page "/clients/new"
+@page "/clients/{Id:int}/edit"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ClientsEdit)]
+@inherits AppPageBase
+@inject ClientRepository Clients
+
+<PageHeader Title="@(Id is null ? "Новий клієнт" : "Редагування клієнта")" Icon="person-vcard"
+            ParentTitle="Клієнти" ParentHref="clients" Subtitle="Поля, позначені *, обов'язкові" />
+
+@if (_client is null)
+{
+    <AccessDeniedMessage />
+}
+else
+{
+    <AlertMessage Errors="Errors" />
+    <form method="post" @formname="client" @onsubmit="SaveAsync" class="panel" style="max-width: 920px">
+        <AntiforgeryToken />
+        <div class="row g-3">
+            <div class="col-12">
+                <span class="form-label required d-block">Тип клієнта</span>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="type" id="type-p" value="@ClientTypes.Person" checked="@(_client.ClientType == ClientTypes.Person)" />
+                    <label class="btn btn-outline-primary" for="type-p"><i class="bi bi-person me-1"></i>Фізична особа</label>
+                    <input type="radio" class="btn-check" name="type" id="type-l" value="@ClientTypes.Legal" checked="@(_client.ClientType == ClientTypes.Legal)" />
+                    <label class="btn btn-outline-primary" for="type-l"><i class="bi bi-building me-1"></i>Юридична особа</label>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <label class="form-label required" for="name">ПІБ / повне найменування</label>
+                <input id="name" name="name" class="form-control" value="@_client.FullName" maxlength="200" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label required" for="taxId">РНОКПП / код ЄДРПОУ</label>
+                <input id="taxId" name="taxId" class="form-control font-monospace" value="@_client.TaxId" maxlength="10" inputmode="numeric" required />
+                <div class="form-hint">10 цифр для фізичної особи, 8 — для юридичної</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="birthDate">Дата народження</label>
+                <input id="birthDate" name="birthDate" type="date" class="form-control" value="@_client.BirthDate?.ToString("yyyy-MM-dd")" />
+                <div class="form-hint">Обов'язкова для фізичної особи, перевіряється за РНОКПП</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="document">Документ</label>
+                <input id="document" name="document" class="form-control" value="@_client.Document" maxlength="30" placeholder="ID 123456789" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="phone">Телефон</label>
+                <input id="phone" name="phone" class="form-control" value="@_client.Phone" maxlength="13" placeholder="+380XXXXXXXXX" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="email">Електронна пошта</label>
+                <input id="email" name="email" type="email" class="form-control" value="@_client.Email" maxlength="100" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="address">Адреса</label>
+                <input id="address" name="address" class="form-control" value="@_client.Address" maxlength="250" />
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Зберегти</button>
+            <a class="btn btn-outline-secondary" href="@(Id is null ? "clients" : $"clients/{Id}")">Скасувати</a>
+        </div>
+    </form>
+}
+
+@code {
+    private Client? _client;
+
+    [Parameter] public int? Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _client = Id is null ? new Client() : await Clients.GetAsync(Id.Value);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        var form = Form;
+        _client.ClientType = form.Text("type") == ClientTypes.Legal ? ClientTypes.Legal : ClientTypes.Person;
+        _client.FullName = form.Text("name");
+        _client.TaxId = form.Text("taxId");
+        _client.BirthDate = form.Date("birthDate");
+        _client.Document = form.Text("document");
+        _client.Phone = form.Text("phone");
+        _client.Email = form.Text("email");
+        _client.Address = form.Text("address");
+
+        Errors.AddRange(ClientValidator.Validate(_client, Fmt.Today));
+        if (Errors.Count > 0)
+        {
+            return;
+        }
+
+        var id = _client.Id;
+        if (await TryAsync(async () =>
+            {
+                if (id == 0)
+                {
+                    id = await Clients.CreateAsync(_client);
+                }
+                else
+                {
+                    await Clients.UpdateAsync(_client);
+                }
+            }))
+        {
+            RedirectWithNotice($"clients/{id}", Id is null ? "client-created" : "client-saved");
+        }
+    }
+}
