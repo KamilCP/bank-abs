@@ -141,3 +141,7 @@ body { background: var(--app-bg); font-variant-numeric: tabular-nums; }
 }
 
 #blazor-error-ui { display: none; }
+
+/* Таблиці з редагуванням у рядку (довідник продуктів) */
+.currency-select { min-width: 5.5rem; }
+.product-name { min-width: 11rem; }

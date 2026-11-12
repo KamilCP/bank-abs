@@ -102,25 +102,33 @@ INSERT INTO credit_product (name, currency_code, annual_rate, min_term_months, m
 -- -----------------------------------------------------------------------------
 -- Демонстраційні клієнти
 -- -----------------------------------------------------------------------------
-INSERT INTO client (client_type, full_name, tax_id, document, birth_date, phone, email, address) VALUES
-    ('P', 'Коваленко Андрій Петрович', '3762629459', 'ID 519837288', '2003-01-06'::date, '+380671096465', 'andrii.kovalenko@example.com', 'м. Біла Церква, вул. Зелена, 37, кв. 118'),
-    ('P', 'Шевчук Олена Василівна', '3421384640', 'ID 374417862', '1993-09-02'::date, '+380672024250', 'olena.shevchuk@example.com', 'м. Бровари, вул. Соборна, 36, кв. 114'),
-    ('P', 'Бондаренко Ігор Миколайович', '2485204639', 'ID 726941481', '1968-01-16'::date, '+380674683153', 'ihor.bondarenko@example.com', 'м. Ірпінь, вул. Садова, 46, кв. 112'),
-    ('P', 'Захарченко Марія Олегівна', '2528790800', 'ID 791854262', '1969-03-26'::date, '+380674579814', 'mariia.zakharchenko@example.com', 'м. Ірпінь, вул. Лісова, 30, кв. 58'),
-    ('P', 'Кравченко Дмитро Сергійович', '2315651891', 'ID 790985870', '1963-05-26'::date, '+380675791247', 'dmytro.kravchenko@example.com', 'м. Біла Церква, просп. Перемоги, 88, кв. 70'),
-    ('P', 'Олійник Наталія Іванівна', '2478920304', 'ID 276398349', '1967-11-14'::date, '+380677469953', 'nataliia.oliinyk@example.com', 'м. Бровари, вул. Миру, 86, кв. 141'),
-    ('P', 'Мельник Олександр Вікторович', '2145800214', 'ID 801932459', '1958-10-01'::date, '+380678211420', 'oleksandr.melnyk@example.com', 'м. Біла Церква, вул. Садова, 103, кв. 16'),
-    ('P', 'Савченко Ірина Андріївна', '2290726920', 'ID 575827813', '1962-09-19'::date, '+380674956332', 'iryna.savchenko@example.com', 'м. Ірпінь, вул. Соборна, 59, кв. 14'),
-    ('P', 'Литвиненко Віктор Олександрович', '3047490594', 'ID 100373443', '1983-06-08'::date, '+380674277491', 'viktor.lytvynenko@example.com', 'м. Ірпінь, вул. Зелена, 90, кв. 82'),
-    ('P', 'Мороз Тетяна Петрівна', '3591960445', 'ID 904536184', '1998-05-05'::date, '+380673591964', 'tetiana.moroz@example.com', 'м. Бориспіль, вул. Миру, 22, кв. 127'),
-    ('P', 'Поліщук Роман Іванович', '2841899295', 'ID 348521083', '1977-10-21'::date, '+380678768379', 'roman.polishchuk@example.com', 'м. Біла Церква, вул. Центральна, 58, кв. 46'),
-    ('P', 'Руденко Оксана Миколаївна', '3279722045', 'ID 541014034', '1989-10-17'::date, '+380676900620', 'oksana.rudenko@example.com', 'м. Ірпінь, вул. Шкільна, 18, кв. 54'),
-    ('P', 'Гончаренко Сергій Юрійович', '3364543250', 'ID 480819032', '1992-02-12'::date, '+380673099431', 'serhii.honcharenko@example.com', 'м. Київ, вул. Соборна, 5, кв. 179'),
-    ('P', 'Левченко Юлія Дмитрівна', '3017115300', 'ID 488441967', '1982-08-09'::date, '+380675993465', 'yuliia.levchenko@example.com', 'м. Бровари, вул. Центральна, 110, кв. 37'),
-    ('L', 'ТОВ «Вектор Плюс»', '32656385', 'Виписка з ЄДР', NULL, '+380447727525', 'info@vector-plus.example.com', 'м. Бориспіль, вул. Центральна, 48, оф. 20'),
-    ('L', 'ТОВ «Агроресурс Південь»', '49500045', 'Виписка з ЄДР', NULL, '+380445355913', 'office@agroresurs.example.com', 'м. Біла Церква, вул. Центральна, 105, оф. 7'),
-    ('L', 'ПП «Будмайстер-Сервіс»', '35721411', 'Виписка з ЄДР', NULL, '+380445925650', 'budmaister@example.com', 'м. Київ, вул. Центральна, 21, оф. 18'),
-    ('L', 'ТОВ «ІТ Рішення Дніпро»', '32201213', 'Виписка з ЄДР', NULL, '+380446062366', 'hello@it-rishennia.example.com', 'м. Київ, вул. Садова, 100, оф. 13');
+-- Клієнти зареєстровані в перший день історії (до відкриття рахунків), тому дата реєстрації
+-- і запис аудиту передують операціям.
+SELECT set_config('bankabs.demo_time', (((current_date - 70) + time '09:00') AT TIME ZONE 'Europe/Kyiv')::text, false),
+       set_config('bankabs.user_id', (SELECT id FROM app_user WHERE login = 'operator')::text, false),
+       set_config('bankabs.user_login', 'operator', false);
+INSERT INTO client (client_type, full_name, tax_id, document, birth_date, phone, email, address, created_at) VALUES
+    ('P', 'Коваленко Андрій Петрович', '3762629459', 'ID 519837288', '2003-01-06'::date, '+380671096465', 'andrii.kovalenko@example.com', 'м. Біла Церква, вул. Зелена, 37, кв. 118', ((current_date - 70) + time '09:00' + interval '0 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Шевчук Олена Василівна', '3421384640', 'ID 374417862', '1993-09-02'::date, '+380672024250', 'olena.shevchuk@example.com', 'м. Бровари, вул. Соборна, 36, кв. 114', ((current_date - 70) + time '09:00' + interval '95 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Бондаренко Ігор Миколайович', '2485204639', 'ID 726941481', '1968-01-16'::date, '+380674683153', 'ihor.bondarenko@example.com', 'м. Ірпінь, вул. Садова, 46, кв. 112', ((current_date - 70) + time '09:00' + interval '190 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Захарченко Марія Олегівна', '2528790800', 'ID 791854262', '1969-03-26'::date, '+380674579814', 'mariia.zakharchenko@example.com', 'м. Ірпінь, вул. Лісова, 30, кв. 58', ((current_date - 70) + time '09:00' + interval '285 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Кравченко Дмитро Сергійович', '2315651891', 'ID 790985870', '1963-05-26'::date, '+380675791247', 'dmytro.kravchenko@example.com', 'м. Біла Церква, просп. Перемоги, 88, кв. 70', ((current_date - 70) + time '09:00' + interval '380 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Олійник Наталія Іванівна', '2478920304', 'ID 276398349', '1967-11-14'::date, '+380677469953', 'nataliia.oliinyk@example.com', 'м. Бровари, вул. Миру, 86, кв. 141', ((current_date - 70) + time '09:00' + interval '475 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Мельник Олександр Вікторович', '2145800214', 'ID 801932459', '1958-10-01'::date, '+380678211420', 'oleksandr.melnyk@example.com', 'м. Біла Церква, вул. Садова, 103, кв. 16', ((current_date - 70) + time '09:00' + interval '570 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Савченко Ірина Андріївна', '2290726920', 'ID 575827813', '1962-09-19'::date, '+380674956332', 'iryna.savchenko@example.com', 'м. Ірпінь, вул. Соборна, 59, кв. 14', ((current_date - 70) + time '09:00' + interval '665 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Литвиненко Віктор Олександрович', '3047490594', 'ID 100373443', '1983-06-08'::date, '+380674277491', 'viktor.lytvynenko@example.com', 'м. Ірпінь, вул. Зелена, 90, кв. 82', ((current_date - 70) + time '09:00' + interval '760 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Мороз Тетяна Петрівна', '3591960445', 'ID 904536184', '1998-05-05'::date, '+380673591964', 'tetiana.moroz@example.com', 'м. Бориспіль, вул. Миру, 22, кв. 127', ((current_date - 70) + time '09:00' + interval '855 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Поліщук Роман Іванович', '2841899295', 'ID 348521083', '1977-10-21'::date, '+380678768379', 'roman.polishchuk@example.com', 'м. Біла Церква, вул. Центральна, 58, кв. 46', ((current_date - 70) + time '09:00' + interval '950 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Руденко Оксана Миколаївна', '3279722045', 'ID 541014034', '1989-10-17'::date, '+380676900620', 'oksana.rudenko@example.com', 'м. Ірпінь, вул. Шкільна, 18, кв. 54', ((current_date - 70) + time '09:00' + interval '1045 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Гончаренко Сергій Юрійович', '3364543250', 'ID 480819032', '1992-02-12'::date, '+380673099431', 'serhii.honcharenko@example.com', 'м. Київ, вул. Соборна, 5, кв. 179', ((current_date - 70) + time '09:00' + interval '1140 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('P', 'Левченко Юлія Дмитрівна', '3017115300', 'ID 488441967', '1982-08-09'::date, '+380675993465', 'yuliia.levchenko@example.com', 'м. Бровари, вул. Центральна, 110, кв. 37', ((current_date - 70) + time '09:00' + interval '1235 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('L', 'ТОВ «Вектор Плюс»', '32656385', 'Виписка з ЄДР', NULL, '+380447727525', 'info@vector-plus.example.com', 'м. Бориспіль, вул. Центральна, 48, оф. 20', ((current_date - 70) + time '09:00' + interval '1330 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('L', 'ТОВ «Агроресурс Південь»', '49500045', 'Виписка з ЄДР', NULL, '+380445355913', 'office@agroresurs.example.com', 'м. Біла Церква, вул. Центральна, 105, оф. 7', ((current_date - 70) + time '09:00' + interval '1425 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('L', 'ПП «Будмайстер-Сервіс»', '35721411', 'Виписка з ЄДР', NULL, '+380445925650', 'budmaister@example.com', 'м. Київ, вул. Центральна, 21, оф. 18', ((current_date - 70) + time '09:00' + interval '1520 seconds') AT TIME ZONE 'Europe/Kyiv'),
+    ('L', 'ТОВ «ІТ Рішення Дніпро»', '32201213', 'Виписка з ЄДР', NULL, '+380446062366', 'hello@it-rishennia.example.com', 'м. Київ, вул. Садова, 100, оф. 13', ((current_date - 70) + time '09:00' + interval '1615 seconds') AT TIME ZONE 'Europe/Kyiv');
+SELECT set_config('bankabs.demo_time', '', false),
+       set_config('bankabs.user_id', '', false),
+       set_config('bankabs.user_login', '', false);
 
 -- -----------------------------------------------------------------------------
 -- Історія операцій за останні 70 днів. Кожна операція виконується серверними

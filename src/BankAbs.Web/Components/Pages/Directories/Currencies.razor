@@ -34,7 +34,7 @@
                             <td class="num">@Fmt.ExchangeRate(CurrencyConverter.Rate(currency.RateToBase, 1m, _margin))</td>
                             <td class="num">@Fmt.ExchangeRate(1m / CurrencyConverter.Rate(1m, currency.RateToBase, _margin))</td>
                             <td class="small text-secondary">@Fmt.DateTime(currency.UpdatedAt)</td>
-                            <td class="text-end"><button form="@($"rate-{currency.Code}")" class="btn btn-sm btn-outline-primary"><i class="bi bi-check-lg"></i> Зберегти</button></td>
+                            <td class="text-end"><button form="@($"rate-{currency.Code}")" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-check-lg"></i> Зберегти</button></td>
                         }
                     </tr>
                 }

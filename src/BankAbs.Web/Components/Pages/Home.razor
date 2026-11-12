@@ -39,13 +39,13 @@ else
     </div>
 
     <div class="row g-3">
-        <div class="col-xl-7">
+        <div class="col-xl-6">
             <div class="panel h-100">
                 <div class="panel-title"><i class="bi bi-bar-chart"></i>Кількість операцій за 14 днів</div>
                 <BarChart Items="_chart" Format="CountFormat" ShowValues="true" Height="220" MarginLeft="40" AriaLabel="Кількість операцій по днях" />
             </div>
         </div>
-        <div class="col-xl-5">
+        <div class="col-xl-6">
             <div class="panel h-100">
                 <div class="panel-title"><i class="bi bi-exclamation-triangle"></i>Кредити з найближчими і простроченими платежами</div>
                 @if (_dueCredits.Count == 0)
@@ -61,7 +61,7 @@ else
                                 @foreach (var credit in _dueCredits)
                                 {
                                     <tr>
-                                        <td><a href="credits/@credit.Id">@credit.ClientName</a></td>
+                                        <td class="text-nowrap"><a href="credits/@credit.Id">@credit.ClientName</a></td>
                                         <td class="@(credit.NextDueDate < Fmt.Today ? "text-danger fw-semibold" : "")">@Fmt.Date(credit.NextDueDate)</td>
                                         <td class="num">@Fmt.Money(credit.MonthlyPayment)</td>
                                         <td><StatusBadge Kind="credit" Value="@credit.Status" /></td>
