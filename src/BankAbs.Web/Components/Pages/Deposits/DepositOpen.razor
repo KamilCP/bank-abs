@@ -1,0 +1,159 @@
+@page "/deposits/new"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.DepositsManage)]
+@inherits AppPageBase
+@inject ClientRepository Clients
+@inject AccountRepository Accounts
+@inject DirectoryRepository Directories
+@inject DepositRepository Deposits
+
+<PageHeader Title="Розміщення вкладу" Icon="piggy-bank" ParentTitle="Депозити" ParentHref="deposits"
+            Subtitle="Кошти списуються з поточного рахунку клієнта на новий депозитний рахунок" />
+
+<AlertMessage Errors="Errors" />
+
+@if (_client is null)
+{
+    <ClientChooser Path="deposits/new" Query="@Q" />
+}
+else
+{
+    <form method="post" @formname="deposit" @onsubmit="SubmitAsync" class="panel" style="max-width: 860px">
+        <AntiforgeryToken />
+        <div class="panel-title"><i class="bi bi-file-earmark-plus"></i>Крок 2. Умови вкладу</div>
+        <div class="picked-item mb-3">
+            <div><div class="fw-semibold">@_client.FullName</div><div class="small text-secondary">@ClientTypes.Title(_client.ClientType) · код @_client.TaxId</div></div>
+            <a class="btn btn-sm btn-outline-secondary" href="deposits/new">Інший клієнт</a>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label required" for="product">Депозитний продукт</label>
+                <select id="product" name="product" class="form-select" required>
+                    @foreach (var product in _products)
+                    {
+                        <option value="@product.Id" selected="@(product.Id == _productId)">@product.Name — @product.CurrencyCode, @Fmt.Rate(product.AnnualRate), @product.TermMonths міс.</option>
+                    }
+                </select>
+                @if (SelectedProduct is { } p)
+                {
+                    <div class="form-hint mt-1">
+                        Мінімальна сума @Fmt.Money(p.MinAmount, p.CurrencyCode) ·
+                        @(p.Capitalization ? "відсотки капіталізуються щомісяця" : "відсотки виплачуються щомісяця на рахунок виплати") ·
+                        @(p.EarlyWithdrawal ? "дострокове розірвання дозволено" : "без дострокового розірвання")
+                    </div>
+                }
+            </div>
+            <div class="col-md-6">
+                <label class="form-label required" for="source">Рахунок списання і виплати</label>
+                <select id="source" name="source" class="form-select" required>
+                    @if (_accounts.Count == 0)
+                    {
+                        <option value="">У клієнта немає відкритих поточних рахунків</option>
+                    }
+                    @foreach (var account in _accounts)
+                    {
+                        <option value="@account.Id" selected="@(account.Id == _sourceId)">@Fmt.Iban(account.Number) — @Fmt.Money(account.Balance, account.CurrencyCode)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label required" for="amount">Сума вкладу</label>
+                <input id="amount" name="amount" type="number" min="1" step="0.01" class="form-control text-end" value="@_amount?.ToString(CultureInfo.InvariantCulture)" required />
+            </div>
+        </div>
+
+        @if (_projection is not null && SelectedProduct is { } sp)
+        {
+            <div class="preview mt-3">
+                <div class="fw-semibold mb-2"><i class="bi bi-calculator me-1"></i>Розрахунок доходу за вкладом</div>
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Строк</dt><dd class="col-sm-7">@sp.TermMonths міс., до @Fmt.Date(Fmt.Today.AddMonths(sp.TermMonths))</dd>
+                    <dt class="col-sm-5">Відсотки за строк</dt><dd class="col-sm-7 text-success">@Fmt.Money(_projection.TotalInterest, sp.CurrencyCode)</dd>
+                    <dt class="col-sm-5">Сума в кінці строку</dt><dd class="col-sm-7">@Fmt.Money(sp.Capitalization ? _projection.FinalAmount : _amount!.Value + _projection.TotalInterest, sp.CurrencyCode)</dd>
+                    <dt class="col-sm-5">Ефективна ставка</dt><dd class="col-sm-7">@Fmt.Rate(_projection.EffectiveRate)</dd>
+                </dl>
+            </div>
+        }
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" name="action" value="preview" class="btn btn-outline-primary"><i class="bi bi-calculator me-1"></i>Розрахувати дохід</button>
+            <button type="submit" name="action" value="confirm" class="btn btn-primary" data-confirm="Розмістити вклад і списати кошти з поточного рахунку?"><i class="bi bi-check2-circle me-1"></i>Розмістити вклад</button>
+            <a class="btn btn-outline-secondary" href="clients/@_client.Id">Скасувати</a>
+        </div>
+    </form>
+}
+
+@code {
+    private Client? _client;
+    private List<DepositProduct> _products = [];
+    private List<Account> _accounts = [];
+    private int _productId;
+    private int _sourceId;
+    private decimal? _amount;
+    private DepositProjection? _projection;
+
+    [SupplyParameterFromQuery(Name = "client")] public int? ClientId { get; set; }
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+
+    private DepositProduct? SelectedProduct => _products.FirstOrDefault(p => p.Id == _productId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ClientId is null)
+        {
+            return;
+        }
+
+        _client = await Clients.GetAsync(ClientId.Value);
+        if (_client is null || _client.Status != ClientStatuses.Active)
+        {
+            _client = null;
+            return;
+        }
+
+        _products = await Directories.DepositProductsAsync(activeOnly: true);
+        _accounts = await Accounts.ListOpenCurrentAsync(null, _client.Id);
+        // За замовчуванням — перший продукт у валюті одного з рахунків клієнта
+        _productId = (_products.FirstOrDefault(p => _accounts.Any(a => a.CurrencyCode == p.CurrencyCode)) ?? _products.FirstOrDefault())?.Id ?? 0;
+        _sourceId = _accounts.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        var form = Form;
+        _productId = form.Int("product") ?? 0;
+        _sourceId = form.Int("source") ?? 0;
+        _amount = form.Decimal("amount");
+        var product = SelectedProduct;
+        if (product is null)
+        {
+            Errors.Add("Оберіть депозитний продукт");
+        }
+
+        if (_amount is not > 0)
+        {
+            Errors.Add("Вкажіть суму вкладу");
+        }
+
+        if (Errors.Count > 0)
+        {
+            return;
+        }
+
+        _projection = DepositCalculator.Project(_amount!.Value, product!.AnnualRate, product.TermMonths, product.Capitalization);
+        if (form.Text("action") != "confirm")
+        {
+            return;
+        }
+
+        var id = 0;
+        if (await TryAsync(async () => id = await Deposits.OpenAsync(_client.Id, _productId, _amount.Value, _sourceId)))
+        {
+            RedirectWithNotice($"deposits/{id}", "deposit-opened");
+        }
+    }
+}

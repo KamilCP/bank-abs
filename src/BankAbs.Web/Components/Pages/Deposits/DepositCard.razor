@@ -1,0 +1,71 @@
+@page "/deposits/{Id:int}"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.DepositsView)]
+@inherits AppPageBase
+@inject DepositRepository Deposits
+@inject ParameterRepository Parameters
+
+@if (_deposit is null)
+{
+    <PageHeader Title="Вклад не знайдено" Icon="piggy-bank" ParentTitle="Депозити" ParentHref="deposits" />
+}
+else
+{
+    <PageHeader Title="@($"Вклад № {_deposit.Id}")" Icon="piggy-bank" ParentTitle="Депозити" ParentHref="deposits"
+                Subtitle="@($"{_deposit.ProductName} · {_deposit.ClientName}")">
+        @if (_deposit.Status == DepositStatuses.Active && _deposit.EarlyWithdrawal && CurrentUser.Can(Permissions.DepositsManage))
+        {
+            <form method="post" @formname="close-early" @onsubmit="CloseEarlyAsync" class="d-inline">
+                <AntiforgeryToken />
+                <button class="btn btn-outline-danger" data-confirm="@($"Розірвати вклад достроково? Відсотки буде перераховано за ставкою {Fmt.Rate(_earlyRate)} річних.")"><i class="bi bi-x-circle me-1"></i>Розірвати достроково</button>
+            </form>
+        }
+    </PageHeader>
+
+    <AlertMessage Errors="Errors" Success="@SuccessText" />
+
+    <div class="kpi-grid">
+        <KpiCard Title="Сума на рахунку вкладу" Value="@Fmt.Money(_deposit.CurrentAmount, _deposit.CurrencyCode)" Icon="cash-stack" Tone="green" Note="@($"розміщено {Fmt.Money(_deposit.Principal)}")" />
+        <KpiCard Title="Нараховано відсотків" Value="@Fmt.Money(_deposit.InterestPaid, _deposit.CurrencyCode)" Icon="percent" Tone="violet" Note="@($"останнє нарахування {Fmt.Date(_deposit.LastAccrualDate)}")" />
+        <KpiCard Title="Ставка" Value="@Fmt.Rate(_deposit.AnnualRate)" Icon="graph-up-arrow" Note="@(_deposit.Capitalization ? "з капіталізацією" : "виплата щомісяця")" />
+        <KpiCard Title="Строк" Value="@($"{Fmt.Date(_deposit.StartDate)} – {Fmt.Date(_deposit.EndDate)}")" Icon="calendar-range" Tone="orange" />
+    </div>
+
+    <div class="panel" style="max-width: 860px">
+        <div class="panel-title"><i class="bi bi-file-text"></i>Умови договору</div>
+        <dl class="row mb-0 small">
+            <dt class="col-sm-4">Клієнт</dt><dd class="col-sm-8"><a href="clients/@_deposit.ClientId">@_deposit.ClientName</a></dd>
+            <dt class="col-sm-4">Депозитний рахунок</dt><dd class="col-sm-8"><a class="font-monospace" href="accounts/@_deposit.AccountId">@Fmt.Iban(_deposit.AccountNumber)</a></dd>
+            <dt class="col-sm-4">Рахунок виплати</dt><dd class="col-sm-8 font-monospace">@Fmt.Iban(_deposit.PayoutNumber)</dd>
+            <dt class="col-sm-4">Прогноз доходу за строк</dt><dd class="col-sm-8">@Fmt.Money(_projection?.TotalInterest ?? 0, _deposit.CurrencyCode) (ефективна ставка @Fmt.Rate(_projection?.EffectiveRate ?? 0))</dd>
+            <dt class="col-sm-4">Дострокове розірвання</dt><dd class="col-sm-8">@(_deposit.EarlyWithdrawal ? "дозволено, ставка " + Fmt.Rate(_earlyRate) : "не передбачено")</dd>
+            <dt class="col-sm-4">Стан</dt><dd class="col-sm-8"><StatusBadge Kind="deposit" Value="@_deposit.Status" /> @(_deposit.ClosedAt is null ? "" : "закрито " + Fmt.Date(_deposit.ClosedAt))</dd>
+        </dl>
+    </div>
+}
+
+@code {
+    private Deposit? _deposit;
+    private DepositProjection? _projection;
+    private decimal _earlyRate;
+
+    [Parameter] public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _deposit = await Deposits.GetAsync(Id);
+        _earlyRate = await Parameters.GetDecimalAsync("deposit.early_rate", 1m);
+        if (_deposit is not null)
+        {
+            var months = ((_deposit.EndDate.Year - _deposit.StartDate.Year) * 12) + _deposit.EndDate.Month - _deposit.StartDate.Month;
+            _projection = DepositCalculator.Project(_deposit.Principal, _deposit.AnnualRate, Math.Max(1, months), _deposit.Capitalization);
+        }
+    }
+
+    private async Task CloseEarlyAsync()
+    {
+        if (CurrentUser.Can(Permissions.DepositsManage) && await TryAsync(() => Deposits.CloseEarlyAsync(Id)))
+        {
+            RedirectWithNotice($"deposits/{Id}", "deposit-closed");
+        }
+    }
+}
