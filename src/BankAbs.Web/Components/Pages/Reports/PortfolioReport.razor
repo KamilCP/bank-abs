@@ -1,0 +1,52 @@
+@page "/reports/portfolio"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ReportsView)]
+@inherits AppPageBase
+@inject ReportRepository Reports
+
+<PageHeader Title="Портфель депозитів і кредитів" Icon="pie-chart" ParentTitle="Звіти" ParentHref="reports">
+    <button class="btn btn-primary" data-print><i class="bi bi-printer me-1"></i>Друкувати</button>
+</PageHeader>
+
+<div class="report-sheet">
+    <ReportHeader Bank="@_bank" Branch="@_branch" User="@CurrentUser.FullName" Title="ЗВІТ ПРО ПОРТФЕЛЬ ДЕПОЗИТІВ І КРЕДИТІВ" Subtitle="@($"станом на {Fmt.Date(Fmt.Today)}")" />
+
+    <h2 class="h6 fw-bold">1. Діючі депозити</h2>
+    <table class="table table-sm table-bordered mb-4">
+        <thead><tr><th>Продукт</th><th>Валюта</th><th class="num">Договорів</th><th class="num">Розміщено</th><th class="num">Поточна сума</th><th class="num">Середня ставка</th><th class="num">Еквівалент, грн</th></tr></thead>
+        <tbody>
+            @foreach (var row in _deposits)
+            {
+                <tr><td>@row.Product</td><td>@row.CurrencyCode</td><td class="num">@row.Count</td><td class="num">@Fmt.Money(row.Amount)</td><td class="num">@Fmt.Money(row.Current)</td><td class="num">@Fmt.Rate(row.AverageRate)</td><td class="num">@Fmt.Money(row.AmountBase)</td></tr>
+            }
+        </tbody>
+        <tfoot><tr><td colspan="2">Разом</td><td class="num">@_deposits.Sum(r => r.Count)</td><td colspan="3"></td><td class="num">@Fmt.Money(_deposits.Sum(r => r.AmountBase))</td></tr></tfoot>
+    </table>
+
+    <h2 class="h6 fw-bold">2. Кредити (діючі і прострочені)</h2>
+    <table class="table table-sm table-bordered">
+        <thead><tr><th>Продукт</th><th>Валюта</th><th class="num">Договорів</th><th class="num">Видано</th><th class="num">Залишок боргу</th><th class="num">Середня ставка</th><th class="num">Прострочено</th><th class="num">Еквівалент, грн</th></tr></thead>
+        <tbody>
+            @foreach (var row in _credits)
+            {
+                <tr class="@(row.OverdueCount > 0 ? "table-warning" : "")"><td>@row.Product</td><td>@row.CurrencyCode</td><td class="num">@row.Count</td><td class="num">@Fmt.Money(row.Amount)</td><td class="num">@Fmt.Money(row.Current)</td><td class="num">@Fmt.Rate(row.AverageRate)</td><td class="num">@row.OverdueCount</td><td class="num">@Fmt.Money(row.AmountBase)</td></tr>
+            }
+        </tbody>
+        <tfoot><tr><td colspan="2">Разом</td><td class="num">@_credits.Sum(r => r.Count)</td><td colspan="3"></td><td class="num">@_credits.Sum(r => r.OverdueCount)</td><td class="num">@Fmt.Money(_credits.Sum(r => r.AmountBase))</td></tr></tfoot>
+    </table>
+    <div class="report-sign"><span>Начальник відділення ____________</span><span>Кредитний менеджер ____________</span></div>
+</div>
+
+@code {
+    private List<PortfolioRow> _deposits = [];
+    private List<PortfolioRow> _credits = [];
+    private string _bank = string.Empty;
+    private string _branch = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        (_bank, _branch) = await Reports.BankInfoAsync();
+        _deposits = await Reports.DepositPortfolioAsync();
+        _credits = await Reports.CreditPortfolioAsync();
+        await Audit.ReportCreatedAsync("Портфель депозитів і кредитів", Fmt.Date(Fmt.Today));
+    }
+}

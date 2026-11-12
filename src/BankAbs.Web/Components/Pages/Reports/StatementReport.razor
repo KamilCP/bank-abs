@@ -1,0 +1,113 @@
+@page "/reports/statement"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ReportsView)]
+@inherits AppPageBase
+@inject AccountRepository Accounts
+@inject ReportRepository Reports
+
+<PageHeader Title="Виписка по рахунку" Icon="file-earmark-text" ParentTitle="Звіти" ParentHref="reports">
+    @if (_header is not null)
+    {
+        <button class="btn btn-primary" data-print><i class="bi bi-printer me-1"></i>Друкувати</button>
+    }
+</PageHeader>
+
+<AlertMessage Errors="Errors" />
+
+<form method="get" action="reports/statement" class="panel filter-bar d-print-none">
+    <input name="number" class="form-control font-monospace" style="min-width: 330px" list="report-accounts" value="@(_account?.Number ?? Number)"
+           placeholder="Номер рахунку або ПІБ клієнта" aria-label="Рахунок" autocomplete="off" />
+    <datalist id="report-accounts">
+        @foreach (var account in _accounts)
+        {
+            <option value="@account.Number">@account.ClientName · @AccountTypes.Title(account.AccountType) · @account.CurrencyCode</option>
+        }
+    </datalist>
+    <label class="small text-secondary" for="from">з</label>
+    <input id="from" type="date" name="from" class="form-control" value="@_from.ToString("yyyy-MM-dd")" />
+    <label class="small text-secondary" for="to">по</label>
+    <input id="to" type="date" name="to" class="form-control" value="@_to.ToString("yyyy-MM-dd")" />
+    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-play me-1"></i>Сформувати</button>
+</form>
+
+@if (_header is not null)
+{
+    <div class="report-sheet">
+        <ReportHeader Bank="@_bank" Branch="@_branch" User="@CurrentUser.FullName" Title="ВИПИСКА ПО РАХУНКУ"
+                      Subtitle="@($"за період з {Fmt.Date(_header.From)} по {Fmt.Date(_header.To)}")" />
+        <table class="table table-sm table-borderless w-auto mb-3">
+            <tbody>
+                <tr><td class="text-secondary pe-4">Рахунок</td><td class="font-monospace fw-semibold">@Fmt.Iban(_header.AccountNumber) (@_header.CurrencyCode, @AccountTypes.Title(_header.AccountType).ToLowerInvariant())</td></tr>
+                <tr><td class="text-secondary pe-4">Власник</td><td>@_header.ClientName, код @_header.TaxId</td></tr>
+                <tr><td class="text-secondary pe-4">Вхідний залишок</td><td class="fw-semibold">@Fmt.Money(_header.OpeningBalance, _header.CurrencyCode)</td></tr>
+            </tbody>
+        </table>
+        <table class="table table-sm table-bordered">
+            <thead><tr><th>Дата і час</th><th>№</th><th>Операція / призначення</th><th>Кореспондент</th><th class="num">Дебет</th><th class="num">Кредит</th><th class="num">Залишок</th></tr></thead>
+            <tbody>
+                @if (_lines.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-secondary">За період операцій не було</td></tr>
+                }
+                @foreach (var line in _lines)
+                {
+                    <tr>
+                        <td class="text-nowrap small">@Fmt.DateTime(line.OpTime)</td>
+                        <td class="small">@line.OperationId</td>
+                        <td class="small"><b>@OperationTypes.Title(line.OpType)</b><br />@line.Description</td>
+                        <td class="small font-monospace">@line.Counterparty</td>
+                        <td class="num">@(line.Debit > 0 ? Fmt.Money(line.Debit) : "")</td>
+                        <td class="num">@(line.Credit > 0 ? Fmt.Money(line.Credit) : "")</td>
+                        <td class="num">@Fmt.Money(line.BalanceAfter)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr><td colspan="4">Обороти за період (@_lines.Count операцій)</td><td class="num">@Fmt.Money(_header.TotalDebit)</td><td class="num">@Fmt.Money(_header.TotalCredit)</td><td></td></tr>
+                <tr><td colspan="6">Вихідний залишок на @Fmt.Date(_header.To)</td><td class="num">@Fmt.Money(_header.ClosingBalance)</td></tr>
+            </tfoot>
+        </table>
+        <div class="report-sign"><span>Відповідальний працівник ____________ @CurrentUser.FullName</span><span>М. П.</span></div>
+    </div>
+}
+
+@code {
+    private List<Account> _accounts = [];
+    private Account? _account;
+    private DateOnly _from;
+    private DateOnly _to;
+    private StatementHeader? _header;
+    private List<StatementLine> _lines = [];
+    private string _bank = string.Empty;
+    private string _branch = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "account")] public int? AccountId { get; set; }
+    [SupplyParameterFromQuery] public string? Number { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? From { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? To { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _to = To ?? Fmt.Today;
+        _from = From ?? new DateOnly(_to.Year, _to.Month, 1).AddMonths(-1);
+        var all = await Accounts.ListAsync(new ListQuery { PageSize = 1000, SortBy = "client" });
+        _accounts = all.Items.Where(a => a.AccountType != AccountTypes.Credit).ToList();
+        _account = AccountId is not null ? await Accounts.GetAsync(AccountId.Value)
+            : !string.IsNullOrWhiteSpace(Number) ? await Accounts.FindByNumberAsync(Number) : null;
+
+        if (!string.IsNullOrWhiteSpace(Number) && _account is null)
+        {
+            Errors.Add("Рахунок з таким номером не знайдено");
+        }
+
+        if (_account is null)
+        {
+            return;
+        }
+
+        (_bank, _branch) = await Reports.BankInfoAsync();
+        if (await TryAsync(async () => (_header, _lines) = await Reports.StatementAsync(_account.Id, _from, _to)))
+        {
+            await Audit.ReportCreatedAsync("Виписка по рахунку", $"{_account.Number}, {Fmt.Date(_from)}–{Fmt.Date(_to)}");
+        }
+    }
+}

@@ -1,0 +1,58 @@
+@page "/reports/credit-schedule/{Id:int}"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ReportsView)]
+@inherits AppPageBase
+@inject CreditRepository Credits
+@inject ReportRepository Reports
+
+<PageHeader Title="Графік погашення кредиту" Icon="calendar3" ParentTitle="Кредит" ParentHref="@($"credits/{Id}")">
+    <button class="btn btn-primary" data-print><i class="bi bi-printer me-1"></i>Друкувати</button>
+</PageHeader>
+
+@if (_credit is not null)
+{
+    <div class="report-sheet">
+        <ReportHeader Bank="@_bank" Branch="@_branch" User="@CurrentUser.FullName" Title="ГРАФІК ПОГАШЕННЯ КРЕДИТУ"
+                      Subtitle="@($"додаток до кредитного договору № {_credit.Id} від {Fmt.Date(_credit.IssueDate)}")" />
+        <table class="table table-sm table-borderless w-auto mb-3">
+            <tbody>
+                <tr><td class="text-secondary pe-4">Позичальник</td><td>@_credit.ClientName</td></tr>
+                <tr><td class="text-secondary pe-4">Кредитний продукт</td><td>@_credit.ProductName</td></tr>
+                <tr><td class="text-secondary pe-4">Сума кредиту</td><td class="fw-semibold">@Fmt.Money(_credit.Amount, _credit.CurrencyCode)</td></tr>
+                <tr><td class="text-secondary pe-4">Процентна ставка</td><td>@Fmt.Rate(_credit.AnnualRate) річних</td></tr>
+                <tr><td class="text-secondary pe-4">Строк</td><td>@_credit.TermMonths міс.</td></tr>
+                <tr><td class="text-secondary pe-4">Рахунок погашення</td><td class="font-monospace">@Fmt.Iban(_credit.CurrentNumber)</td></tr>
+            </tbody>
+        </table>
+        <table class="table table-sm table-bordered">
+            <thead><tr><th>№</th><th>Дата платежу</th><th class="num">Сума платежу</th><th class="num">Погашення тіла</th><th class="num">Відсотки</th><th class="num">Залишок боргу</th><th>Відмітка</th></tr></thead>
+            <tbody>
+                @foreach (var row in _schedule)
+                {
+                    <tr><td>@row.Number</td><td>@Fmt.Date(row.DueDate)</td><td class="num">@Fmt.Money(row.Payment)</td><td class="num">@Fmt.Money(row.Principal)</td><td class="num">@Fmt.Money(row.Interest)</td><td class="num">@Fmt.Money(row.BalanceAfter)</td><td class="small">@(row.PaidAt is null ? "" : "сплачено " + Fmt.DateTime(row.PaidAt))</td></tr>
+                }
+            </tbody>
+            <tfoot><tr><td colspan="2">Разом</td><td class="num">@Fmt.Money(_schedule.Sum(s => s.Payment))</td><td class="num">@Fmt.Money(_schedule.Sum(s => s.Principal))</td><td class="num">@Fmt.Money(_schedule.Sum(s => s.Interest))</td><td colspan="2"></td></tr></tfoot>
+        </table>
+        <div class="report-sign"><span>Від банку ____________</span><span>Позичальник ____________</span></div>
+    </div>
+}
+
+@code {
+    private Credit? _credit;
+    private List<CreditScheduleItem> _schedule = [];
+    private string _bank = string.Empty;
+    private string _branch = string.Empty;
+
+    [Parameter] public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _credit = await Credits.GetAsync(Id);
+        if (_credit is not null)
+        {
+            _schedule = await Credits.ScheduleAsync(Id);
+            (_bank, _branch) = await Reports.BankInfoAsync();
+            await Audit.ReportCreatedAsync("Графік погашення кредиту", $"кредит № {Id}");
+        }
+    }
+}

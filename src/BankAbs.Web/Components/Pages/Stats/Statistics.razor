@@ -1,0 +1,142 @@
+@page "/stats"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.StatsView)]
+@inherits AppPageBase
+@inject StatsRepository Stats
+@inject ReportRepository Reports
+
+<PageHeader Title="Статистика" Icon="bar-chart-line" Subtitle="Узагальнені показники діяльності відділення в табличному і графічному вигляді" />
+
+<form method="get" action="stats" class="panel filter-bar">
+    <span class="small text-secondary">Період</span>
+    <input type="date" name="from" class="form-control" value="@_from.ToString("yyyy-MM-dd")" aria-label="Початок періоду" />
+    <span class="small text-secondary">—</span>
+    <input type="date" name="to" class="form-control" value="@_to.ToString("yyyy-MM-dd")" aria-label="Кінець періоду" />
+    <select name="kind" class="form-select" data-autosubmit aria-label="Тип операції">
+        <option value="">Усі операції</option>
+        @foreach (var type in OperationTypes.All)
+        {
+            <option value="@type" selected="@(Kind == type)">@OperationTypes.Title(type)</option>
+        }
+    </select>
+    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Оновити</button>
+    <span class="ms-2 small">
+        <a href="stats?from=@Fmt.Today.AddDays(-6).ToString("yyyy-MM-dd")&to=@Fmt.Today.ToString("yyyy-MM-dd")">7 днів</a> ·
+        <a href="stats?from=@Fmt.Today.AddDays(-29).ToString("yyyy-MM-dd")&to=@Fmt.Today.ToString("yyyy-MM-dd")">30 днів</a> ·
+        <a href="stats?from=@Fmt.Today.AddDays(-89).ToString("yyyy-MM-dd")&to=@Fmt.Today.ToString("yyyy-MM-dd")">90 днів</a>
+    </span>
+</form>
+
+<div class="kpi-grid">
+    <KpiCard Title="Операцій за період" Value="@Fmt.Number(_days.Sum(d => d.Count))" Icon="arrow-left-right" Note="@($"у середньому {(_days.Count == 0 ? 0 : _days.Sum(d => d.Count) / (decimal)_days.Count):0.#} на день")" />
+    <KpiCard Title="Оборот за період" Value="@Fmt.MoneyShort(_days.Sum(d => d.TurnoverBase))" Icon="cash-stack" Tone="green" />
+    <KpiCard Title="Кошти клієнтів" Value="@Fmt.MoneyShort(_kpi?.FundsBase ?? 0)" Icon="wallet2" Tone="violet" />
+    <KpiCard Title="Кредитний портфель" Value="@Fmt.MoneyShort(_kpi?.CreditPortfolioBase ?? 0)" Icon="credit-card-2-front" Tone="orange" Note="@($"прострочено {Fmt.MoneyShort(_kpi?.OverdueDebtBase ?? 0)}")" />
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-title"><i class="bi bi-bar-chart"></i>Кількість операцій по днях</div>
+            <BarChart Items="_countChart" Format="CountFormat" MarginLeft="40" AriaLabel="Кількість операцій по днях" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-title"><i class="bi bi-graph-up"></i>Оборот по днях, грн</div>
+            <BarChart Items="_turnoverChart" Color="#1baf7a" AriaLabel="Оборот по днях" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-title"><i class="bi bi-pie-chart"></i>Структура обороту за видами операцій, грн</div>
+            <DonutChart Items="_typeChart" CenterLabel="грн" AriaLabel="Структура обороту" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-title"><i class="bi bi-currency-exchange"></i>Кошти клієнтів за валютами (еквівалент, грн)</div>
+            <DonutChart Items="_currencyChart" CenterLabel="грн" AriaLabel="Кошти за валютами" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-title"><i class="bi bi-credit-card-2-front"></i>Кредити за станом (кількість)</div>
+            <DonutChart Items="_creditChart" Format="CountFormat" CenterLabel="договорів" AriaLabel="Кредити за станом" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-title"><i class="bi bi-trophy"></i>Клієнти з найбільшим обсягом коштів</div>
+            <table class="table table-sm">
+                <thead><tr><th>#</th><th>Клієнт</th><th class="num">Кошти, грн</th><th class="num">Борг, грн</th></tr></thead>
+                <tbody>
+                    @for (var i = 0; i < _top.Count; i++)
+                    {
+                        var c = _top[i];
+                        <tr><td>@(i + 1)</td><td><a href="clients/@c.ClientId">@c.Name</a></td><td class="num">@Fmt.Money(c.FundsBase)</td><td class="num">@(c.DebtBase > 0 ? Fmt.Money(c.DebtBase) : "—")</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-table"></i>Підсумки операцій за період</div>
+    <table class="table table-sm w-auto">
+        <thead><tr><th>Вид операції</th><th>Валюта</th><th class="num">Кількість</th><th class="num">Сума</th><th class="num">Еквівалент, грн</th><th class="num">Частка</th></tr></thead>
+        <tbody>
+            @{ var totalBase = _totals.Sum(t => t.AmountBase); }
+            @foreach (var t in _totals)
+            {
+                <tr><td>@OperationTypes.Title(t.OpType)</td><td>@t.CurrencyCode</td><td class="num">@t.Count</td><td class="num">@Fmt.Money(t.Amount)</td><td class="num">@Fmt.Money(t.AmountBase)</td><td class="num">@(totalBase > 0 ? (t.AmountBase / totalBase).ToString("P1", Fmt.Culture) : "—")</td></tr>
+            }
+        </tbody>
+        <tfoot><tr><td colspan="2">Разом</td><td class="num">@_totals.Sum(t => t.Count)</td><td></td><td class="num">@Fmt.Money(totalBase)</td><td class="num">100 %</td></tr></tfoot>
+    </table>
+</div>
+
+@code {
+    private const int DefaultDays = 30;
+    private const int TopCount = 8;
+    private DateOnly _from;
+    private DateOnly _to;
+    private KeyIndicators? _kpi;
+    private List<DailyPoint> _days = [];
+    private List<ChartItem> _countChart = [];
+    private List<ChartItem> _turnoverChart = [];
+    private List<ChartItem> _typeChart = [];
+    private List<ChartItem> _currencyChart = [];
+    private List<ChartItem> _creditChart = [];
+    private List<TopClient> _top = [];
+    private List<OperationTotal> _totals = [];
+
+    [SupplyParameterFromQuery] public DateOnly? From { get; set; }
+    [SupplyParameterFromQuery] public DateOnly? To { get; set; }
+    [SupplyParameterFromQuery] public string? Kind { get; set; }
+
+    private static string CountFormat(decimal value) => value.ToString("0", Fmt.Culture);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _to = To ?? Fmt.Today;
+        _from = From ?? _to.AddDays(1 - DefaultDays);
+        if (_from > _to)
+        {
+            (_from, _to) = (_to, _from);
+        }
+
+        var kind = string.IsNullOrEmpty(Kind) ? null : Kind;
+        _kpi = await Stats.IndicatorsAsync();
+        _days = await Stats.OperationsByDayAsync(_from, _to, kind);
+        _countChart = _days.Select(d => new ChartItem(d.Day.ToString("dd.MM", CultureInfo.InvariantCulture), d.Count)).ToList();
+        _turnoverChart = _days.Select(d => new ChartItem(d.Day.ToString("dd.MM", CultureInfo.InvariantCulture), d.TurnoverBase)).ToList();
+        _typeChart = (await Stats.TurnoverByTypeAsync(_from, _to)).Select(t => new ChartItem(OperationTypes.Title(t.Category), t.Value)).ToList();
+        _currencyChart = (await Stats.FundsByCurrencyAsync()).Select(c => new ChartItem(c.CurrencyCode, c.TotalBase)).ToList();
+        _creditChart = (await Stats.CreditsByStatusAsync()).Select(c => new ChartItem(CreditStatuses.Title(c.Category), c.Count,
+            c.Category == CreditStatuses.Overdue ? "#e34948" : c.Category == CreditStatuses.Repaid ? "#9aa5b1" : "#2a78d6")).ToList();
+        _top = await Stats.TopClientsAsync(TopCount);
+        _totals = await Reports.TotalsByTypeAsync(_from, _to);
+        await Audit.ReportCreatedAsync("Статистика", $"{Fmt.Date(_from)}–{Fmt.Date(_to)}");
+    }
+}

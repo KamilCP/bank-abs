@@ -1,0 +1,32 @@
+@page "/reports"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ReportsView)]
+@inherits AppPageBase
+
+<PageHeader Title="Звіти" Icon="printer" Subtitle="Звіти формуються на поточний момент і готові до друку (Ctrl+P або кнопка «Друкувати»)" />
+
+<div class="row g-3" style="max-width: 1100px">
+    @foreach (var report in Items)
+    {
+        <div class="col-md-6">
+            <a class="panel d-flex gap-3 text-decoration-none text-body h-100" href="@report.Href">
+                <div class="page-icon flex-shrink-0"><i class="bi bi-@report.Icon"></i></div>
+                <div>
+                    <div class="fw-semibold">@report.Title</div>
+                    <div class="small text-secondary">@report.Description</div>
+                </div>
+            </a>
+        </div>
+    }
+</div>
+
+@code {
+    private sealed record ReportLink(string Title, string Description, string Icon, string Href);
+
+    private static readonly ReportLink[] Items =
+    [
+        new("Виписка по рахунку", "Рух коштів за період з вхідним і вихідним залишком, підсумки дебету і кредиту", "file-earmark-text", "reports/statement"),
+        new("Операції за день", "Реєстр операцій відділення за обрану дату з підсумками за видами операцій і виконавцями", "calendar-day", "reports/daily"),
+        new("Портфель депозитів і кредитів", "Діючі договори за продуктами: кількість, суми, середні ставки, прострочка", "pie-chart", "reports/portfolio"),
+        new("Графік погашення кредиту", "Відкривається з картки кредиту: кнопка «Графік для друку»", "calendar3", "credits"),
+    ];
+}

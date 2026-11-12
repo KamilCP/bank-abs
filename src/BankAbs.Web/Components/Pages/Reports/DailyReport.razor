@@ -1,0 +1,87 @@
+@page "/reports/daily"
+@attribute [Authorize(Policy = Permissions.PolicyPrefix + Permissions.ReportsView)]
+@inherits AppPageBase
+@inject ReportRepository Reports
+
+<PageHeader Title="Операції за день" Icon="calendar-day" ParentTitle="Звіти" ParentHref="reports">
+    <button class="btn btn-primary" data-print><i class="bi bi-printer me-1"></i>Друкувати</button>
+</PageHeader>
+
+<form method="get" action="reports/daily" class="panel filter-bar d-print-none">
+    <label class="small text-secondary" for="day">Дата</label>
+    <input id="day" type="date" name="day" class="form-control" value="@_day.ToString("yyyy-MM-dd")" />
+    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-play me-1"></i>Сформувати</button>
+    <a class="btn btn-link" href="reports/daily?day=@_day.AddDays(-1).ToString("yyyy-MM-dd")"><i class="bi bi-chevron-left"></i> попередній день</a>
+</form>
+
+<div class="report-sheet">
+    <ReportHeader Bank="@_bank" Branch="@_branch" User="@CurrentUser.FullName" Title="РЕЄСТР ОПЕРАЦІЙ ЗА ДЕНЬ" Subtitle="@Fmt.Date(_day)" />
+
+    <h2 class="h6 fw-bold">1. Підсумки за видами операцій</h2>
+    <table class="table table-sm table-bordered w-auto mb-4">
+        <thead><tr><th>Вид операції</th><th>Валюта</th><th class="num">Кількість</th><th class="num">Сума</th><th class="num">Еквівалент, грн</th></tr></thead>
+        <tbody>
+            @if (_totals.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-secondary">Операцій не було</td></tr>
+            }
+            @foreach (var total in _totals)
+            {
+                <tr><td>@OperationTypes.Title(total.OpType)</td><td>@total.CurrencyCode</td><td class="num">@total.Count</td><td class="num">@Fmt.Money(total.Amount)</td><td class="num">@Fmt.Money(total.AmountBase)</td></tr>
+            }
+        </tbody>
+        <tfoot><tr><td colspan="2">Разом</td><td class="num">@_totals.Sum(t => t.Count)</td><td></td><td class="num">@Fmt.Money(_totals.Sum(t => t.AmountBase))</td></tr></tfoot>
+    </table>
+
+    <h2 class="h6 fw-bold">2. Підсумки за виконавцями</h2>
+    <table class="table table-sm table-bordered w-auto mb-4">
+        <thead><tr><th>Працівник</th><th>Логін</th><th class="num">Операцій</th><th class="num">Оборот, грн</th></tr></thead>
+        <tbody>
+            @foreach (var user in _users)
+            {
+                <tr><td>@user.FullName</td><td>@user.Login</td><td class="num">@user.Count</td><td class="num">@Fmt.Money(user.AmountBase)</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <h2 class="h6 fw-bold">3. Реєстр операцій</h2>
+    <table class="table table-sm table-bordered">
+        <thead><tr><th>Час</th><th>№</th><th>Операція</th><th>Рахунок списання</th><th>Рахунок зарахування</th><th class="num">Сума</th><th>Виконавець</th></tr></thead>
+        <tbody>
+            @foreach (var op in _operations)
+            {
+                <tr>
+                    <td class="small">@Fmt.Time(op.OpTime)</td>
+                    <td class="small">@op.Id</td>
+                    <td class="small">@OperationTypes.Title(op.OpType)</td>
+                    <td class="small">@(op.FromClient ?? "—")<div class="font-monospace text-secondary">@op.FromNumber</div></td>
+                    <td class="small">@(op.ToClient ?? "—")<div class="font-monospace text-secondary">@op.ToNumber</div></td>
+                    <td class="num">@Fmt.Money(op.Amount, op.CurrencyCode)</td>
+                    <td class="small">@op.UserLogin</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="report-sign"><span>Начальник відділення ____________</span><span>Касир ____________</span></div>
+</div>
+
+@code {
+    private DateOnly _day;
+    private List<OperationTotal> _totals = [];
+    private List<UserTotal> _users = [];
+    private List<Operation> _operations = [];
+    private string _bank = string.Empty;
+    private string _branch = string.Empty;
+
+    [SupplyParameterFromQuery] public DateOnly? Day { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _day = Day ?? Fmt.Today;
+        (_bank, _branch) = await Reports.BankInfoAsync();
+        _totals = await Reports.TotalsByTypeAsync(_day, _day);
+        _users = await Reports.TotalsByUserAsync(_day, _day);
+        _operations = await Reports.DayOperationsAsync(_day);
+        await Audit.ReportCreatedAsync("Операції за день", Fmt.Date(_day));
+    }
+}
