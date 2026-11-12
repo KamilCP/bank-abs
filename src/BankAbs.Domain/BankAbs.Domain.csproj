@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Предметна область: сутності, бізнес-правила і розрахунки без залежностей від БД та UI -->
+  <PropertyGroup>
+    <RootNamespace>BankAbs.Domain</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>
