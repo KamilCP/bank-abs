@@ -1,0 +1,55 @@
+@* Кільцева діаграма часток з легендою *@
+@{
+    var total = Items.Sum(i => i.Value);
+    var offset = 0.0;
+}
+<div class="d-flex flex-wrap align-items-center gap-3">
+    <svg viewBox="0 0 160 160" width="@Size" height="@Size" role="img" aria-label="@AriaLabel">
+        <circle cx="80" cy="80" r="@Radius" fill="none" stroke="var(--chart-track)" stroke-width="@Stroke" />
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            if (total <= 0 || item.Value <= 0)
+            {
+                continue;
+            }
+
+            var length = (double)(item.Value / total) * Circumference;
+            <circle cx="80" cy="80" r="@Radius" fill="none" stroke="@(item.Color ?? ChartPalette.At(i))" stroke-width="@Stroke"
+                    stroke-dasharray="@N(Math.Max(length - Gap, 0.5)) @N(Circumference)" stroke-dashoffset="@N(-offset)"
+                    transform="rotate(-90 80 80)"><title>@item.Label: @Format(item.Value)</title></circle>
+            offset += length;
+        }
+        <g>
+            <text x="80" y="76" text-anchor="middle" class="donut-total">@Format(total)</text>
+            <text x="80" y="96" text-anchor="middle" class="chart-axis">@CenterLabel</text>
+        </g>
+    </svg>
+    <ul class="chart-legend list-unstyled mb-0">
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            <li>
+                <span class="legend-swatch" style="background:@(item.Color ?? ChartPalette.At(i))"></span>
+                <span class="legend-label">@item.Label</span>
+                <span class="legend-value">@Format(item.Value)</span>
+                <span class="legend-share">@(total > 0 ? (item.Value / total).ToString("P0", Fmt.Culture) : "—")</span>
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    private const double Radius = 60;
+    private const double Stroke = 22;
+    private const double Gap = 1.5;
+    private static readonly double Circumference = 2 * Math.PI * Radius;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ChartItem> Items { get; set; } = [];
+    [Parameter] public Func<decimal, string> Format { get; set; } = Fmt.Compact;
+    [Parameter] public string CenterLabel { get; set; } = "усього";
+    [Parameter] public int Size { get; set; } = 170;
+    [Parameter] public string AriaLabel { get; set; } = "Кільцева діаграма";
+
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}

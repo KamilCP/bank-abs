@@ -1,0 +1,23 @@
+@page "/error"
+@attribute [AllowAnonymous]
+@using System.Diagnostics
+<PageTitle>Помилка — Bank ABS</PageTitle>
+<div class="empty-state">
+    <i class="bi bi-bug display-4 text-danger"></i>
+    <h1 class="h4 mt-3">Під час обробки запиту сталася помилка</h1>
+    @if (!string.IsNullOrEmpty(RequestId))
+    {
+        <p class="text-secondary">Код запиту для адміністратора: <code>@RequestId</code></p>
+    }
+    <a class="btn btn-primary" href="">На головну</a>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

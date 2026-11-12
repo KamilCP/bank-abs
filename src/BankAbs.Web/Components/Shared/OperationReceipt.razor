@@ -1,0 +1,39 @@
+@* Квитанція про проведену операцію (для друку клієнту) *@
+<div class="report-sheet mb-3" style="max-width: 760px">
+    <div class="report-head">
+        <div><b>@BankName</b><div class="small text-secondary">@BranchName</div></div>
+        <div class="text-end small">Квитанція № <b>@Operation.Id</b><br />@Fmt.DateTime(Operation.OpTime)</div>
+    </div>
+    <div class="report-title">@OperationTypes.Title(Operation.OpType)</div>
+    <table class="table table-sm table-borderless mb-0">
+        <tbody>
+            @if (Operation.FromNumber is not null)
+            {
+                <tr><th class="w-25 fw-normal text-secondary">Рахунок списання</th><td class="font-monospace">@Fmt.Iban(Operation.FromNumber)<div class="small font-sans-serif">@Operation.FromClient</div></td></tr>
+            }
+            @if (Operation.ToNumber is not null)
+            {
+                <tr><th class="w-25 fw-normal text-secondary">Рахунок зарахування</th><td class="font-monospace">@Fmt.Iban(Operation.ToNumber)<div class="small">@Operation.ToClient</div></td></tr>
+            }
+            <tr><th class="fw-normal text-secondary">Сума</th><td class="fw-bold fs-5">@Fmt.Money(Operation.Amount, Operation.CurrencyCode)</td></tr>
+            @if (Operation.AmountTo is not null)
+            {
+                <tr><th class="fw-normal text-secondary">Зараховано</th><td class="fw-semibold">@Fmt.Money(Operation.AmountTo.Value, Operation.CurrencyTo) <span class="small text-secondary">за курсом @Fmt.ExchangeRate(Operation.Rate ?? 0)</span></td></tr>
+            }
+            <tr><th class="fw-normal text-secondary">Призначення</th><td>@Operation.Description</td></tr>
+            <tr><th class="fw-normal text-secondary">Виконавець</th><td>@Operation.UserLogin</td></tr>
+        </tbody>
+    </table>
+    <div class="report-sign"><span>Підпис працівника банку ____________</span><span>Підпис клієнта ____________</span></div>
+    <div class="mt-3 d-print-none d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-print><i class="bi bi-printer me-1"></i>Друкувати квитанцію</button>
+        <a class="btn btn-link btn-sm" href="@NewOperationUrl">Нова операція</a>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Operation Operation { get; set; } = default!;
+    [Parameter] public string BankName { get; set; } = string.Empty;
+    [Parameter] public string BranchName { get; set; } = string.Empty;
+    [Parameter] public string NewOperationUrl { get; set; } = string.Empty;
+}

@@ -1,0 +1,7 @@
+@* Кнопки форми фільтрів: застосувати і скинути *@
+<button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i>Знайти</button>
+<a class="btn btn-link text-secondary" href="@ResetUrl">Скинути</a>
+
+@code {
+    [Parameter, EditorRequired] public string ResetUrl { get; set; } = string.Empty;
+}

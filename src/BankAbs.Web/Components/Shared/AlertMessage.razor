@@ -1,0 +1,35 @@
+@* Повідомлення про результат дії: помилки (червоне) або успіх (зелене) *@
+@if (Errors is { Count: > 0 })
+{
+    <div class="alert alert-danger d-flex gap-2" role="alert">
+        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+        <div>
+            @if (Errors.Count == 1)
+            {
+                @Errors[0]
+            }
+            else
+            {
+                <div class="fw-semibold mb-1">Перевірте введені дані:</div>
+                <ul class="mb-0 ps-3">
+                    @foreach (var error in Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+}
+@if (!string.IsNullOrEmpty(Success))
+{
+    <div class="alert alert-success d-flex gap-2 align-items-start" role="status">
+        <i class="bi bi-check-circle-fill mt-1"></i>
+        <div class="flex-grow-1">@Success</div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<string>? Errors { get; set; }
+    [Parameter] public string? Success { get; set; }
+}

@@ -1,0 +1,12 @@
+@* Список відкритих поточних рахунків для поля з автопідказкою (HTML datalist) *@
+<datalist id="@Id">
+    @foreach (var account in Accounts)
+    {
+        <option value="@account.Number">@account.ClientName · @Fmt.Money(account.Balance, account.CurrencyCode)</option>
+    }
+</datalist>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<Account> Accounts { get; set; } = [];
+}

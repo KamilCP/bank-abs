@@ -1,0 +1,47 @@
+@* Перший крок оформлення договору: пошук і вибір клієнта (GET-форма) *@
+@inject ClientRepository Clients
+
+<div class="panel" style="max-width: 860px">
+    <div class="panel-title"><i class="bi bi-person-check"></i>Крок 1. Оберіть клієнта</div>
+    <form method="get" action="@Path" class="filter-bar">
+        <SearchField Value="@Query" Placeholder="ПІБ, найменування або код клієнта…" />
+        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search me-1"></i>Знайти</button>
+    </form>
+    @if (_clients is not null)
+    {
+        @if (_clients.Count == 0)
+        {
+            <p class="small text-secondary mb-0">Активних клієнтів не знайдено.</p>
+        }
+        else
+        {
+            <table class="table table-sm table-hover">
+                <thead><tr><th>Клієнт</th><th>Тип</th><th>Код</th><th class="num">Кошти, грн</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var client in _clients)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@client.FullName</td>
+                            <td class="small">@ClientTypes.Title(client.ClientType)</td>
+                            <td class="font-monospace">@client.TaxId</td>
+                            <td class="num">@Fmt.Money(client.TotalBalanceBase)</td>
+                            <td class="text-end"><a class="btn btn-sm btn-primary" href="@($"{Path}?client={client.Id}")">Обрати</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</div>
+
+@code {
+    private List<Client>? _clients;
+
+    [Parameter, EditorRequired] public string Path { get; set; } = string.Empty;
+    [Parameter] public string? Query { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _clients = await Clients.SearchAsync(Query);
+    }
+}

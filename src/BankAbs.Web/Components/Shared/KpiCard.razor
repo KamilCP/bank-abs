@@ -1,0 +1,20 @@
+@* Плитка ключового показника *@
+<div class="kpi-card">
+    <div class="kpi-icon kpi-@Tone"><i class="bi bi-@Icon"></i></div>
+    <div class="min-w-0">
+        <div class="kpi-title">@Title</div>
+        <div class="kpi-value">@Value</div>
+        @if (!string.IsNullOrEmpty(Note))
+        {
+            <div class="kpi-note">@Note</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = "graph-up";
+    [Parameter] public string? Note { get; set; }
+    [Parameter] public string Tone { get; set; } = "blue";
+}

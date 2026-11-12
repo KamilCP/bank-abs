@@ -1,0 +1,114 @@
+@page "/login"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@inject LoginService LoginService
+@inject NavigationManager Navigation
+
+<PageTitle>Вхід — Bank ABS</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-brand">
+            <img src="favicon.svg" alt="" width="46" height="46" />
+            <div>
+                <div class="h4 mb-0 fw-bold">Bank ABS</div>
+                <div class="small text-secondary">Автоматизована система діяльності банку</div>
+            </div>
+        </div>
+
+        @if (Timeout == 1)
+        {
+            <div class="alert alert-warning small py-2"><i class="bi bi-clock-history me-1"></i>Сеанс завершено через неактивність. Увійдіть знову.</div>
+        }
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger small py-2" role="alert"><i class="bi bi-exclamation-triangle me-1"></i>@_error</div>
+        }
+
+        <EditForm Model="Input" FormName="login" OnValidSubmit="SignInAsync" method="post" Enhance="false">
+            <DataAnnotationsValidator />
+            <div class="mb-3">
+                <label for="login" class="form-label required">Логін</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <InputText id="login" class="form-control" @bind-Value="Input!.Login" autocomplete="username" autofocus />
+                </div>
+                <ValidationMessage For="() => Input!.Login" class="small text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label required">Пароль</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-key"></i></span>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="Input!.Password" autocomplete="current-password" />
+                </div>
+                <ValidationMessage For="() => Input!.Password" class="small text-danger" />
+            </div>
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-box-arrow-in-right me-1"></i>Увійти</button>
+        </EditForm>
+
+        <div class="small text-secondary mt-4 border-top pt-3">
+            Демонстраційні облікові записи: <code>admin</code> / <code>Admin123!</code>, <code>operator</code> / <code>Oper123!</code>,
+            <code>credit</code> / <code>Credit123!</code>, <code>manager</code> / <code>Manager123!</code>
+        </div>
+        <div class="small text-body-tertiary mt-2 text-center">Версія @AppInfo.Version</div>
+    </div>
+</div>
+
+@code {
+    private string? _error;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private LoginModel? Input { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private int? Timeout { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Input ??= new LoginModel();
+        if (HttpMethods.IsGet(HttpContext.Request.Method) && HttpContext.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo(SafeReturnUrl, forceLoad: true);
+        }
+    }
+
+    private string SafeReturnUrl =>
+        !string.IsNullOrEmpty(ReturnUrl) && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//", StringComparison.Ordinal)
+            && !ReturnUrl.StartsWith("/login", StringComparison.OrdinalIgnoreCase) && !ReturnUrl.StartsWith("/logout", StringComparison.OrdinalIgnoreCase)
+            ? ReturnUrl
+            : "/";
+
+    private async Task SignInAsync()
+    {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
+        var result = await LoginService.SignInAsync(Input!.Login, Input.Password, ip);
+        if (!result.Succeeded)
+        {
+            _error = result.Error;
+            Input.Password = string.Empty;
+            return;
+        }
+
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, result.Principal!);
+        Navigation.NavigateTo(SafeReturnUrl, forceLoad: true);
+    }
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "Введіть логін")]
+        public string Login { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Введіть пароль")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

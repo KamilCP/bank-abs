@@ -1,0 +1,80 @@
+@* Стовпчикова діаграма (SVG, без зовнішніх бібліотек) *@
+@{
+    var max = NiceMax(Items.Count == 0 ? 0 : Items.Max(i => i.Value));
+    var plotWidth = Width - MarginLeft - MarginRight;
+    var plotHeight = Height - MarginTop - MarginBottom;
+    var slot = Items.Count == 0 ? 0 : (double)plotWidth / Items.Count;
+    var barWidth = Math.Max(2, slot * 0.7);
+    var every = Math.Max(1, (int)Math.Ceiling(Items.Count / (double)MaxLabels));
+}
+<figure class="chart mb-0">
+    <svg viewBox="0 0 @Width @Height" role="img" aria-label="@AriaLabel" class="w-100" preserveAspectRatio="xMidYMid meet">
+        @for (var t = 0; t <= Ticks; t++)
+        {
+            var value = max * t / Ticks;
+            var y = MarginTop + plotHeight - (double)(max == 0 ? 0 : value / max) * plotHeight;
+            <g>
+                <line x1="@MarginLeft" x2="@(Width - MarginRight)" y1="@N(y)" y2="@N(y)" class="chart-grid" />
+                <text x="@(MarginLeft - 8)" y="@N(y + 4)" text-anchor="end" class="chart-axis">@Format(value)</text>
+            </g>
+        }
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            var h = max == 0 ? 0 : (double)(item.Value / max) * plotHeight;
+            var x = MarginLeft + (i * slot) + ((slot - barWidth) / 2);
+            var y = MarginTop + plotHeight - h;
+            <g>
+                <rect x="@N(x)" y="@N(y)" width="@N(barWidth)" height="@N(Math.Max(h, item.Value > 0 ? 1 : 0))" rx="2"
+                      fill="@(item.Color ?? Color)"><title>@item.Label: @Format(item.Value)</title></rect>
+                @if (ShowValues && item.Value > 0)
+                {
+                    <g><text x="@N(x + (barWidth / 2))" y="@N(y - 4)" text-anchor="middle" class="chart-value">@Format(item.Value)</text></g>
+                }
+                @if (i % every == 0)
+                {
+                    <g><text x="@N(x + (barWidth / 2))" y="@(Height - MarginBottom + 16)" text-anchor="middle" class="chart-axis">@item.Label</text></g>
+                }
+            </g>
+        }
+        <line x1="@MarginLeft" x2="@(Width - MarginRight)" y1="@(MarginTop + plotHeight)" y2="@(MarginTop + plotHeight)" class="chart-baseline" />
+    </svg>
+</figure>
+
+@code {
+    private const int Ticks = 4;
+    private const int MarginTop = 18;
+    private const int MarginRight = 10;
+    private const int MarginBottom = 26;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ChartItem> Items { get; set; } = [];
+    [Parameter] public int Width { get; set; } = 720;
+    [Parameter] public int Height { get; set; } = 240;
+    [Parameter] public int MarginLeft { get; set; } = 64;
+    [Parameter] public string Color { get; set; } = ChartPalette.At(0);
+    [Parameter] public Func<decimal, string> Format { get; set; } = Fmt.Compact;
+    [Parameter] public bool ShowValues { get; set; }
+    [Parameter] public int MaxLabels { get; set; } = 12;
+    [Parameter] public string AriaLabel { get; set; } = "Діаграма";
+
+    private static string N(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static decimal NiceMax(decimal value)
+    {
+        if (value <= 0)
+        {
+            return 1;
+        }
+
+        var magnitude = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)value)));
+        foreach (var step in new[] { 1m, 2m, 2.5m, 5m, 10m })
+        {
+            if (value <= step * magnitude)
+            {
+                return step * magnitude;
+            }
+        }
+
+        return 10 * magnitude;
+    }
+}

@@ -1,0 +1,31 @@
+@* Заголовок сторінки: значок, назва, підзаголовок, кнопки дій праворуч *@
+<PageTitle>@Title — Bank ABS</PageTitle>
+<div class="page-header">
+    <div class="d-flex align-items-center gap-3">
+        <div class="page-icon"><i class="bi bi-@Icon"></i></div>
+        <div>
+            @if (!string.IsNullOrEmpty(ParentTitle))
+            {
+                <nav aria-label="breadcrumb" class="small"><a href="@ParentHref">@ParentTitle</a> <i class="bi bi-chevron-right small"></i></nav>
+            }
+            <h1 class="h4 mb-0" tabindex="-1">@Title</h1>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <div class="text-secondary small">@Subtitle</div>
+            }
+        </div>
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="page-actions d-print-none">@ChildContent</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = "file-earmark";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? ParentTitle { get; set; }
+    [Parameter] public string? ParentHref { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

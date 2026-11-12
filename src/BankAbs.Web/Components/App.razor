@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap-icons/font/bootstrap-icons.min.css"]" />
+    <link rel="stylesheet" href="@Assets["css/app.css"]" />
+    <link rel="stylesheet" href="@Assets["BankAbs.Web.styles.css"]" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    @* Статичний серверний рендеринг (SSR) з покращеною навігацією Blazor: переходи і відправлення
+       форм з атрибутом data-enhance виконуються без повного перезавантаження сторінки *@
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["js/app.js"]"></script>
+</body>
+
+</html>

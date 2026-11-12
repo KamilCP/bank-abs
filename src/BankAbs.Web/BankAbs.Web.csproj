@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Веб-застосунок Blazor (Interactive Server): інтерфейс користувача, автентифікація, звіти -->
+  <PropertyGroup>
+    <RootNamespace>BankAbs.Web</RootNamespace>
+    <UserSecretsId>bankabs-581-ipz-sabirzhanov</UserSecretsId>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BankAbs.Data\BankAbs.Data.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+</Project>

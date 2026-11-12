@@ -1,0 +1,111 @@
+@inject CurrentUserContext CurrentUser
+
+<div class="nav-section">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All"><i class="bi bi-house"></i>Головна</NavLink>
+</div>
+
+@if (Any(Permissions.ClientsView, Permissions.AccountsView))
+{
+    <div class="nav-section">
+        <div class="nav-heading">Клієнти і рахунки</div>
+        @if (CurrentUser.Can(Permissions.ClientsView))
+        {
+            <NavLink class="nav-link" href="clients"><i class="bi bi-people"></i>Клієнти</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.AccountsView))
+        {
+            <NavLink class="nav-link" href="accounts"><i class="bi bi-wallet2"></i>Рахунки</NavLink>
+        }
+    </div>
+}
+
+@if (Any(Permissions.CashOperate, Permissions.TransfersMake, Permissions.OperationsView))
+{
+    <div class="nav-section">
+        <div class="nav-heading">Операції</div>
+        @if (CurrentUser.Can(Permissions.CashOperate))
+        {
+            <NavLink class="nav-link" href="operations/cash"><i class="bi bi-cash-coin"></i>Каса</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.TransfersMake))
+        {
+            <NavLink class="nav-link" href="operations/transfer"><i class="bi bi-arrow-left-right"></i>Переказ</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.OperationsView))
+        {
+            <NavLink class="nav-link" href="operations" Match="NavLinkMatch.All"><i class="bi bi-journal-text"></i>Журнал операцій</NavLink>
+        }
+    </div>
+}
+
+@if (Any(Permissions.DepositsView, Permissions.CreditsView))
+{
+    <div class="nav-section">
+        <div class="nav-heading">Продукти</div>
+        @if (CurrentUser.Can(Permissions.DepositsView))
+        {
+            <NavLink class="nav-link" href="deposits"><i class="bi bi-piggy-bank"></i>Депозити</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.CreditsView))
+        {
+            <NavLink class="nav-link" href="credits"><i class="bi bi-credit-card-2-front"></i>Кредити</NavLink>
+        }
+    </div>
+}
+
+@if (Any(Permissions.ReportsView, Permissions.StatsView))
+{
+    <div class="nav-section">
+        <div class="nav-heading">Звіти і аналіз</div>
+        @if (CurrentUser.Can(Permissions.ReportsView))
+        {
+            <NavLink class="nav-link" href="reports"><i class="bi bi-printer"></i>Звіти</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.StatsView))
+        {
+            <NavLink class="nav-link" href="stats"><i class="bi bi-bar-chart-line"></i>Статистика</NavLink>
+        }
+    </div>
+}
+
+@if (Any(Permissions.DirectoriesEdit))
+{
+    <div class="nav-section">
+        <div class="nav-heading">Довідники</div>
+        <NavLink class="nav-link" href="directories/currencies"><i class="bi bi-currency-exchange"></i>Валюти і курси</NavLink>
+        <NavLink class="nav-link" href="directories/products"><i class="bi bi-box-seam"></i>Продукти банку</NavLink>
+    </div>
+}
+
+@if (Any(Permissions.AdminUsers, Permissions.AdminRoles, Permissions.AdminLog, Permissions.AdminSettings))
+{
+    <div class="nav-section">
+        <div class="nav-heading">Адміністрування</div>
+        @if (CurrentUser.Can(Permissions.AdminUsers))
+        {
+            <NavLink class="nav-link" href="admin/users"><i class="bi bi-person-gear"></i>Користувачі</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.AdminRoles))
+        {
+            <NavLink class="nav-link" href="admin/roles"><i class="bi bi-shield-lock"></i>Ролі і права</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.AdminLog))
+        {
+            <NavLink class="nav-link" href="admin/log"><i class="bi bi-list-check"></i>Журнал системи</NavLink>
+        }
+        @if (CurrentUser.Can(Permissions.AdminSettings))
+        {
+            <NavLink class="nav-link" href="admin/settings"><i class="bi bi-sliders"></i>Параметри</NavLink>
+        }
+    </div>
+}
+
+<div class="nav-section">
+    <div class="nav-heading">Допомога</div>
+    <NavLink class="nav-link" href="help"><i class="bi bi-question-circle"></i>Довідка</NavLink>
+    <NavLink class="nav-link" href="about"><i class="bi bi-info-circle"></i>Про програму</NavLink>
+</div>
+
+@code {
+    private bool Any(params string[] permissions) => permissions.Any(CurrentUser.Can);
+}

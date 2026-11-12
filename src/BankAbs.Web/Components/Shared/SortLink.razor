@@ -1,0 +1,15 @@
+@* Заголовок колонки з посиланням сортування: перше натискання — за зростанням, друге — за спаданням *@
+<th class="@CssClass" aria-sort="@AriaSort">
+    <a class="sort-link @(Active ? "active" : "")" href="@State.SortUrl(Column)" title="Сортувати">@Title<i class="bi @Icon"></i></a>
+</th>
+
+@code {
+    [Parameter, EditorRequired] public string Column { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public ListState State { get; set; } = new();
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+
+    private bool Active => State.Sort == Column;
+    private string Icon => !Active ? "bi-arrow-down-up text-body-tertiary" : State.Desc ? "bi-sort-down" : "bi-sort-up";
+    private string AriaSort => !Active ? "none" : State.Desc ? "descending" : "ascending";
+}

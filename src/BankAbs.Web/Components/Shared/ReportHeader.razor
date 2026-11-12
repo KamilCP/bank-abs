@@ -1,0 +1,19 @@
+@* Шапка друкованого звіту: банк, відділення, дата формування, назва і параметри *@
+<div class="report-head">
+    <div><b>@Bank</b><div class="small text-secondary">@Branch</div></div>
+    <div class="text-end small">Сформовано: @Fmt.DateTime(DateTime.UtcNow)<br />Користувач: @User</div>
+</div>
+<div class="report-title">@Title
+    @if (!string.IsNullOrEmpty(Subtitle))
+    {
+        <div class="fw-normal fs-6 mt-1">@Subtitle</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Bank { get; set; } = string.Empty;
+    [Parameter] public string Branch { get; set; } = string.Empty;
+    [Parameter] public string User { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+}

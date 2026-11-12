@@ -1,0 +1,47 @@
+@inherits LayoutComponentBase
+@inject CurrentUserContext CurrentUser
+@inject ParameterRepository Parameters
+
+<div class="app-shell">
+    <header class="app-topbar d-print-none">
+        <a class="app-brand" href="">
+            <img src="favicon.svg" alt="" width="28" height="28" />
+            <span>Bank ABS</span>
+        </a>
+        <span class="app-branch d-none d-md-inline">@_branch</span>
+        <div class="ms-auto d-flex align-items-center gap-3">
+            <span class="d-none d-lg-inline small text-white-50"><i class="bi bi-calendar3 me-1"></i>@Fmt.Date(Fmt.Today)</span>
+            <a class="app-user" href="help" title="Довідка"><i class="bi bi-question-circle fs-5"></i></a>
+            <div class="app-user">
+                <i class="bi bi-person-circle fs-4"></i>
+                <div class="lh-sm">
+                    <div class="fw-semibold">@CurrentUser.FullName</div>
+                    <div class="small text-white-50">@CurrentUser.RoleName</div>
+                </div>
+            </div>
+            <a class="btn btn-sm btn-outline-light" href="logout" data-enhance-nav="false"><i class="bi bi-box-arrow-right me-1"></i>Вийти</a>
+        </div>
+    </header>
+    <div class="app-body">
+        <nav class="app-sidebar d-print-none" aria-label="Головне меню">
+            <NavMenu />
+        </nav>
+        <main class="app-content">
+            @Body
+        </main>
+    </div>
+    <footer class="app-statusbar d-print-none">
+        <span><i class="bi bi-database me-1"></i>PostgreSQL</span>
+        <span>Користувач: <b>@CurrentUser.Login</b></span>
+        <span class="ms-auto">Bank ABS @AppInfo.Version · збірка @AppInfo.BuildNumber</span>
+    </footer>
+</div>
+
+@code {
+    private string _branch = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _branch = await Parameters.GetTextAsync("bank.branch", string.Empty);
+    }
+}

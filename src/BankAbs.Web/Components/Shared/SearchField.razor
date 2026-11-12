@@ -1,0 +1,10 @@
+@* Поле пошуку у формі фільтрів (GET): пошук за Enter або кнопкою «Знайти» *@
+<div class="input-group search-box">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="search" name="q" class="form-control" placeholder="@Placeholder" value="@Value" aria-label="@Placeholder" />
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Пошук…";
+}

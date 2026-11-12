@@ -1,0 +1,12 @@
+<select form="@FormId" name="currency" class="form-select form-select-sm" aria-label="Валюта">
+    @foreach (var currency in Currencies)
+    {
+        <option value="@currency.Code" selected="@(currency.Code == Value)">@currency.Code</option>
+    }
+</select>
+
+@code {
+    [Parameter, EditorRequired] public string FormId { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<Currency> Currencies { get; set; } = [];
+    [Parameter] public string? Value { get; set; }
+}

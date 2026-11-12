@@ -1,0 +1,131 @@
+@page "/"
+@attribute [Authorize]
+@inject StatsRepository Stats
+@inject OperationRepository Operations
+@inject CreditRepository Credits
+@inject CurrentUserContext CurrentUser
+
+<PageHeader Title="Головна" Icon="house" Subtitle="@($"Вітаємо, {CurrentUser.FullName}! Стан на {Fmt.Date(Fmt.Today)}")">
+    @if (CurrentUser.Can(Permissions.ClientsEdit))
+    {
+        <a class="btn btn-outline-primary" href="clients/new"><i class="bi bi-person-plus me-1"></i>Новий клієнт</a>
+    }
+    @if (CurrentUser.Can(Permissions.CashOperate))
+    {
+        <a class="btn btn-outline-primary" href="operations/cash"><i class="bi bi-cash-coin me-1"></i>Каса</a>
+    }
+    @if (CurrentUser.Can(Permissions.TransfersMake))
+    {
+        <a class="btn btn-primary" href="operations/transfer"><i class="bi bi-arrow-left-right me-1"></i>Переказ</a>
+    }
+    @if (CurrentUser.Can(Permissions.CreditsManage))
+    {
+        <a class="btn btn-primary" href="credits/new"><i class="bi bi-credit-card-2-front me-1"></i>Видати кредит</a>
+    }
+</PageHeader>
+
+@if (_kpi is null)
+{
+    <Loading />
+}
+else
+{
+    <div class="kpi-grid">
+        <KpiCard Title="Клієнти" Value="@Fmt.Number(_kpi.ClientsTotal)" Icon="people" Note="@($"{Fmt.Number(_kpi.OpenAccounts)} відкритих рахунків")" />
+        <KpiCard Title="Кошти клієнтів" Value="@Fmt.MoneyShort(_kpi.FundsBase)" Icon="wallet2" Tone="green" Note="поточні і депозитні рахунки" />
+        <KpiCard Title="Депозитний портфель" Value="@Fmt.MoneyShort(_kpi.DepositPortfolioBase)" Icon="piggy-bank" Tone="violet" Note="@($"{_kpi.DepositsActive} діючих вкладів")" />
+        <KpiCard Title="Кредитний портфель" Value="@Fmt.MoneyShort(_kpi.CreditPortfolioBase)" Icon="credit-card-2-front" Tone="orange" Note="@($"{_kpi.CreditsActive} кредитів, прострочено {_kpi.OverdueCount}")" />
+        <KpiCard Title="Операції сьогодні" Value="@Fmt.Number(_kpi.OpsToday)" Icon="arrow-left-right" Note="@($"оборот {Fmt.MoneyShort(_kpi.TurnoverTodayBase)}")" />
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-7">
+            <div class="panel h-100">
+                <div class="panel-title"><i class="bi bi-bar-chart"></i>Кількість операцій за 14 днів</div>
+                <BarChart Items="_chart" Format="CountFormat" ShowValues="true" Height="220" MarginLeft="40" AriaLabel="Кількість операцій по днях" />
+            </div>
+        </div>
+        <div class="col-xl-5">
+            <div class="panel h-100">
+                <div class="panel-title"><i class="bi bi-exclamation-triangle"></i>Кредити з найближчими і простроченими платежами</div>
+                @if (_dueCredits.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">Немає діючих кредитів.</p>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="table table-sm">
+                            <thead><tr><th>Клієнт</th><th>Платіж</th><th class="num">Сума</th><th>Стан</th></tr></thead>
+                            <tbody>
+                                @foreach (var credit in _dueCredits)
+                                {
+                                    <tr>
+                                        <td><a href="credits/@credit.Id">@credit.ClientName</a></td>
+                                        <td class="@(credit.NextDueDate < Fmt.Today ? "text-danger fw-semibold" : "")">@Fmt.Date(credit.NextDueDate)</td>
+                                        <td class="num">@Fmt.Money(credit.MonthlyPayment)</td>
+                                        <td><StatusBadge Kind="credit" Value="@credit.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (CurrentUser.Can(Permissions.OperationsView))
+    {
+        <div class="panel mt-3">
+            <div class="panel-title"><i class="bi bi-clock-history"></i>Останні операції <a class="ms-auto small fw-normal" href="operations">Увесь журнал</a></div>
+            <div class="table-wrap">
+                <table class="table table-sm table-hover">
+                    <thead><tr><th>№</th><th>Час</th><th>Операція</th><th>Списання</th><th>Зарахування</th><th class="num">Сума</th><th>Виконавець</th></tr></thead>
+                    <tbody>
+                        @foreach (var op in _recent)
+                        {
+                            <tr>
+                                <td class="text-secondary">@op.Id</td>
+                                <td class="text-nowrap">@Fmt.DateTime(op.OpTime)</td>
+                                <td><span class="badge badge-type">@OperationTypes.Title(op.OpType)</span></td>
+                                <td class="small">@(op.FromClient ?? "—")</td>
+                                <td class="small">@(op.ToClient ?? "—")</td>
+                                <td class="num fw-semibold">@Fmt.Money(op.Amount, op.CurrencyCode)</td>
+                                <td class="small text-secondary">@op.UserLogin</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private const int ChartDays = 14;
+    private const int RecentCount = 8;
+    private KeyIndicators? _kpi;
+    private List<ChartItem> _chart = [];
+    private List<Operation> _recent = [];
+    private List<Credit> _dueCredits = [];
+
+    private static string CountFormat(decimal value) => value.ToString("0", Fmt.Culture);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _kpi = await Stats.IndicatorsAsync();
+        var days = await Stats.OperationsByDayAsync(Fmt.Today.AddDays(1 - ChartDays), Fmt.Today, null);
+        _chart = days.Select(d => new ChartItem(d.Day.ToString("dd.MM", CultureInfo.InvariantCulture), d.Count)).ToList();
+        if (CurrentUser.Can(Permissions.OperationsView))
+        {
+            _recent = await Operations.RecentAsync(RecentCount);
+        }
+
+        if (CurrentUser.Can(Permissions.CreditsView))
+        {
+            var page = await Credits.ListAsync(new ListQuery { SortBy = "next", PageSize = 6 });
+            _dueCredits = page.Items.Where(c => c.Status != CreditStatuses.Repaid).ToList();
+        }
+    }
+}

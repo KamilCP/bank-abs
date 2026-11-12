@@ -1,0 +1,143 @@
+/* =============================================================================
+   Bank ABS — стилі інтерфейсу (доповнюють Bootstrap 5).
+   Кольори, відступи і правила відображення описані в docs/UI_STANDARD.md.
+   ============================================================================= */
+:root {
+    --app-topbar: #0f2742;
+    --app-sidebar: #16324f;
+    --app-sidebar-text: #c9d6e6;
+    --app-sidebar-active: #2a78d6;
+    --app-bg: #f4f6f9;
+    --app-border: #dfe4ea;
+    --chart-track: #eef1f5;
+    --ok: #157347;
+    --ok-bg: #e3f4ea;
+    --warn: #8a5a00;
+    --warn-bg: #fff4d6;
+    --bad: #b02a37;
+    --bad-bg: #fbe5e7;
+    --off: #5c6670;
+    --off-bg: #eceff2;
+    --bs-body-font-size: 0.925rem;
+    --bs-primary: #2a78d6;
+    --bs-primary-rgb: 42, 120, 214;
+    --bs-link-color: #1f63b8;
+    --bs-link-color-rgb: 31, 99, 184;
+}
+
+html, body { height: 100%; }
+body { background: var(--app-bg); font-variant-numeric: tabular-nums; }
+
+.btn-primary { --bs-btn-bg: #2a78d6; --bs-btn-border-color: #2a78d6; --bs-btn-hover-bg: #1f63b8; --bs-btn-hover-border-color: #1f63b8; --bs-btn-active-bg: #1c58a3; }
+.btn-outline-primary { --bs-btn-color: #2a78d6; --bs-btn-border-color: #2a78d6; --bs-btn-hover-bg: #2a78d6; --bs-btn-hover-border-color: #2a78d6; }
+.pagination { --bs-pagination-active-bg: #2a78d6; --bs-pagination-active-border-color: #2a78d6; }
+
+/* ---------- Каркас ---------- */
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.app-topbar { background: var(--app-topbar); color: #fff; display: flex; align-items: center; gap: 1rem; padding: .5rem 1.25rem; position: sticky; top: 0; z-index: 1030; }
+.app-brand { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; font-weight: 700; font-size: 1.15rem; letter-spacing: .3px; }
+.app-brand:hover { color: #fff; }
+.app-branch { color: #9fb3c8; font-size: .85rem; border-left: 1px solid #36506d; padding-left: 1rem; }
+.app-user { display: flex; align-items: center; gap: .5rem; color: #fff; text-decoration: none; }
+.app-user:hover { color: #fff; }
+.app-body { display: flex; flex: 1; min-height: 0; }
+.app-sidebar { background: var(--app-sidebar); width: 232px; flex-shrink: 0; padding: .75rem .5rem 2rem; overflow-y: auto; position: sticky; top: 52px; height: calc(100vh - 52px - 30px); }
+.app-content { flex: 1; min-width: 0; padding: 1.25rem 1.5rem 2rem; }
+.app-statusbar { background: #fff; border-top: 1px solid var(--app-border); color: #5c6670; font-size: .78rem; display: flex; gap: 1.5rem; padding: .3rem 1.25rem; position: sticky; bottom: 0; z-index: 1020; }
+
+.nav-section { margin-bottom: .75rem; }
+.nav-heading { color: #7f98b3; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .25rem .75rem; }
+.app-sidebar .nav-link { color: var(--app-sidebar-text); display: flex; align-items: center; gap: .65rem; padding: .42rem .75rem; border-radius: .4rem; font-size: .9rem; }
+.app-sidebar .nav-link i { font-size: 1.05rem; width: 1.2rem; text-align: center; }
+.app-sidebar .nav-link:hover { background: rgba(255,255,255,.07); color: #fff; }
+.app-sidebar .nav-link.active { background: var(--app-sidebar-active); color: #fff; }
+
+/* ---------- Заголовок сторінки ---------- */
+.page-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.page-icon { width: 44px; height: 44px; border-radius: 10px; background: #e3eefb; color: #2a78d6; display: grid; place-items: center; font-size: 1.35rem; }
+.page-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.page-header nav a { color: #5c6670; text-decoration: none; }
+
+/* ---------- Панелі, таблиці, форми ---------- */
+.panel { background: #fff; border: 1px solid var(--app-border); border-radius: .6rem; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+.panel-title { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem; }
+.panel-title i { color: #2a78d6; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .75rem; }
+.filter-bar .form-select, .filter-bar .form-control { width: auto; }
+.search-box { max-width: 360px; min-width: 220px; }
+.table-wrap { overflow-x: auto; }
+.table { --bs-table-hover-bg: #f1f6fd; margin-bottom: 0; }
+.table thead th { background: #f7f9fb; color: #46505a; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; border-bottom-width: 1px; }
+.table td { vertical-align: middle; }
+.table .num, .num { text-align: right; white-space: nowrap; }
+.table tfoot td { font-weight: 600; background: #f7f9fb; }
+.row-link { cursor: pointer; }
+.sort-button { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; display: inline-flex; gap: .3rem; align-items: center; }
+.sort-button.active { color: #1f63b8; }
+.font-monospace { font-size: .86em; }
+.amount-in { color: #157347; }
+.amount-out { color: #b02a37; }
+.form-label { font-weight: 500; font-size: .85rem; margin-bottom: .25rem; }
+.required::after { content: " *"; color: #b02a37; }
+.form-hint { font-size: .78rem; color: #6c757d; }
+.picked-item { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border: 1px solid var(--app-border); border-radius: .45rem; padding: .45rem .7rem; background: #f7f9fb; }
+.picker-results { position: absolute; z-index: 1000; left: 0; right: 0; top: calc(100% + 2px); max-height: 320px; overflow-y: auto; }
+.preview { background: #f2f7fd; border: 1px dashed #9ec5f4; border-radius: .5rem; padding: .75rem 1rem; }
+.preview dt { font-weight: 500; color: #5c6670; font-size: .82rem; }
+.preview dd { font-weight: 600; margin-bottom: .35rem; }
+.empty-state { text-align: center; padding: 3rem 1rem; }
+.details-json { background: #f7f9fb; border-radius: .35rem; padding: .5rem .75rem; font-size: .78rem; white-space: pre-wrap; word-break: break-word; margin: 0; }
+.min-w-0 { min-width: 0; }
+
+/* ---------- Позначки станів ---------- */
+.status-badge { font-weight: 500; font-size: .76rem; padding: .3em .55em; }
+.badge-ok { background: var(--ok-bg); color: var(--ok); }
+.badge-warn { background: var(--warn-bg); color: var(--warn); }
+.badge-bad { background: var(--bad-bg); color: var(--bad); }
+.badge-off { background: var(--off-bg); color: var(--off); }
+.badge-type { background: #e3eefb; color: #1f63b8; font-weight: 500; }
+
+/* ---------- Показники і діаграми ---------- */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .9rem; margin-bottom: 1rem; }
+.kpi-card { background: #fff; border: 1px solid var(--app-border); border-radius: .6rem; padding: .9rem 1rem; display: flex; gap: .85rem; align-items: center; }
+.kpi-icon { width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; font-size: 1.25rem; }
+.kpi-blue { background: #e3eefb; color: #2a78d6; }
+.kpi-green { background: #e3f4ea; color: #157347; }
+.kpi-orange { background: #fdeee6; color: #c4501f; }
+.kpi-red { background: #fbe5e7; color: #b02a37; }
+.kpi-violet { background: #ecebfb; color: #6250d6; }
+.kpi-title { color: #5c6670; font-size: .78rem; }
+.kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.kpi-note { color: #6c757d; font-size: .75rem; }
+.chart-grid { stroke: #e9edf2; stroke-width: 1; }
+.chart-baseline { stroke: #aab4bf; stroke-width: 1; }
+.chart-axis { fill: #6c757d; font-size: 11px; }
+.chart-value { fill: #343a40; font-size: 10px; font-weight: 600; }
+.donut-total { fill: #212529; font-size: 17px; font-weight: 700; }
+.chart-legend li { display: grid; grid-template-columns: 12px minmax(110px, 1fr) auto 3.2rem; gap: .5rem; align-items: center; font-size: .85rem; padding: .15rem 0; }
+.legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+.legend-value { font-weight: 600; text-align: right; }
+.legend-share { color: #6c757d; text-align: right; }
+
+/* ---------- Вхід ---------- */
+.login-page { min-height: 100vh; display: grid; place-items: center; background: linear-gradient(135deg, #0f2742 0%, #16324f 55%, #1f4f82 100%); padding: 1rem; }
+.login-card { width: 100%; max-width: 410px; background: #fff; border-radius: .9rem; box-shadow: 0 20px 50px rgba(0,0,0,.3); padding: 2rem 2rem 1.5rem; }
+.login-brand { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.25rem; }
+
+/* ---------- Звіти і друк ---------- */
+.report-sheet { background: #fff; border: 1px solid var(--app-border); border-radius: .4rem; padding: 1.5rem 1.75rem; }
+.report-head { display: flex; justify-content: space-between; border-bottom: 2px solid #212529; padding-bottom: .5rem; margin-bottom: 1rem; }
+.report-title { text-align: center; font-weight: 700; font-size: 1.1rem; margin: .5rem 0 1rem; }
+.report-sign { display: flex; justify-content: space-between; margin-top: 2.5rem; font-size: .85rem; }
+
+@media print {
+    @page { size: A4; margin: 14mm 12mm; }
+    body { background: #fff; font-size: 11pt; }
+    .app-content { padding: 0; }
+    .report-sheet { border: 0; padding: 0; }
+    .table thead th { background: #fff !important; }
+    .no-print, .d-print-none { display: none !important; }
+    a { color: inherit; text-decoration: none; }
+}
+
+#blazor-error-ui { display: none; }

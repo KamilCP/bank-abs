@@ -1,0 +1,68 @@
+@typeparam TItem
+@* Навігація сторінками таблиці і кількість записів *@
+@if (Result is not null)
+{
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 small">
+        <span class="text-secondary">
+            @if (Result.TotalCount == 0)
+            {
+                <text>Записів не знайдено</text>
+            }
+            else
+            {
+                <text>Показано @((Result.Page - 1) * Result.PageSize + 1)–@Math.Min(Result.Page * Result.PageSize, Result.TotalCount) з @Fmt.Number(Result.TotalCount)</text>
+            }
+        </span>
+        @if (Result.PageCount > 1)
+        {
+            <nav aria-label="Сторінки">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Result.Page <= 1 ? "disabled" : "")">
+                        <a class="page-link" href="@State.PageUrl(Result.Page - 1)" aria-label="Попередня"><i class="bi bi-chevron-left"></i></a>
+                    </li>
+                    @foreach (var pageNumber in Pages())
+                    {
+                        if (pageNumber == 0)
+                        {
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        }
+                        else
+                        {
+                            <li class="page-item @(pageNumber == Result.Page ? "active" : "")"><a class="page-link" href="@State.PageUrl(pageNumber)">@pageNumber</a></li>
+                        }
+                    }
+                    <li class="page-item @(Result.Page >= Result.PageCount ? "disabled" : "")">
+                        <a class="page-link" href="@State.PageUrl(Result.Page + 1)" aria-label="Наступна"><i class="bi bi-chevron-right"></i></a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+}
+
+@code {
+    private const int Window = 2;
+
+    [Parameter, EditorRequired] public PagedResult<TItem>? Result { get; set; }
+    [Parameter, EditorRequired] public ListState State { get; set; } = new();
+
+    private IEnumerable<int> Pages()
+    {
+        var count = Result!.PageCount;
+        var current = Result.Page;
+        var previous = 0;
+        for (var p = 1; p <= count; p++)
+        {
+            if (p == 1 || p == count || Math.Abs(p - current) <= Window)
+            {
+                if (previous != 0 && p - previous > 1)
+                {
+                    yield return 0;
+                }
+
+                previous = p;
+                yield return p;
+            }
+        }
+    }
+}

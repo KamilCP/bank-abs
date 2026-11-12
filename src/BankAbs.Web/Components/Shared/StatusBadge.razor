@@ -1,0 +1,29 @@
+@* Позначка стану запису: колір і значок визначаються стандартом інтерфейсу *@
+<span class="badge status-badge @Css"><i class="bi @Icon me-1"></i>@Text</span>
+
+@code {
+    [Parameter, EditorRequired] public string Kind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string? Value { get; set; }
+
+    private (string Text, string Css, string Icon) Info => (Kind, Value) switch
+    {
+        ("client", ClientStatuses.Active) => (ClientStatuses.Title(Value), "badge-ok", "bi-check-circle"),
+        ("client", _) => (ClientStatuses.Title(Value), "badge-bad", "bi-slash-circle"),
+        ("account", AccountStatuses.Open) => (AccountStatuses.Title(Value), "badge-ok", "bi-unlock"),
+        ("account", _) => (AccountStatuses.Title(Value), "badge-off", "bi-lock"),
+        ("deposit", DepositStatuses.Active) => (DepositStatuses.Title(Value), "badge-ok", "bi-hourglass-split"),
+        ("deposit", DepositStatuses.ClosedEarly) => (DepositStatuses.Title(Value), "badge-warn", "bi-x-circle"),
+        ("deposit", _) => (DepositStatuses.Title(Value), "badge-off", "bi-check2-all"),
+        ("credit", CreditStatuses.Active) => (CreditStatuses.Title(Value), "badge-ok", "bi-hourglass-split"),
+        ("credit", CreditStatuses.Overdue) => (CreditStatuses.Title(Value), "badge-bad", "bi-exclamation-triangle"),
+        ("credit", _) => (CreditStatuses.Title(Value), "badge-off", "bi-check2-all"),
+        ("user", "active") => ("Активний", "badge-ok", "bi-person-check"),
+        ("user", "locked") => ("Тимчасово заблокований", "badge-warn", "bi-lock"),
+        ("user", _) => ("Заблокований", "badge-bad", "bi-person-slash"),
+        _ => (Value ?? string.Empty, "badge-off", "bi-circle"),
+    };
+
+    private string Text => Info.Text;
+    private string Css => Info.Css;
+    private string Icon => Info.Icon;
+}
