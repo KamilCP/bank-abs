@@ -23,6 +23,19 @@ public static class SessionValidator
     public static async Task ValidateAsync(CookieValidatePrincipalContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        try
+        {
+            await ValidateCoreAsync(context);
+        }
+        catch (Exception ex) when (ex is DbException or System.Net.Sockets.SocketException)
+        {
+            // Сервер БД недоступний: сеанс не перевіряється. Будь-яка сторінка з даними все одно звернеться до БД
+            // і перейде на сторінку помилки, а сама сторінка помилки покаже повідомлення замість порожньої сторінки 500.
+        }
+    }
+
+    private static async Task ValidateCoreAsync(CookieValidatePrincipalContext context)
+    {
         var principal = context.Principal;
         if (principal is null || !int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out var userId))

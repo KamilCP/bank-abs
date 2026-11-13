@@ -1,10 +1,16 @@
 @page "/error"
 @attribute [AllowAnonymous]
+@layout EmptyLayout
 @using System.Diagnostics
 <PageTitle>Помилка — Bank ABS</PageTitle>
 <div class="empty-state">
     <i class="bi bi-bug display-4 text-danger"></i>
     <h1 class="h4 mt-3">Під час обробки запиту сталася помилка</h1>
+    @if (IsDatabaseUnavailable)
+    {
+        <p>Сервер бази даних тимчасово недоступний. Повторіть дію через кілька хвилин; якщо помилка
+            повторюється — зверніться до адміністратора.</p>
+    }
     @if (!string.IsNullOrEmpty(RequestId))
     {
         <p class="text-secondary">Код запиту для адміністратора: <code>@RequestId</code></p>
@@ -18,6 +24,13 @@
 
     private string? RequestId { get; set; }
 
-    protected override void OnInitialized() =>
+    private bool IsDatabaseUnavailable { get; set; }
+
+    protected override void OnInitialized()
+    {
         RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+        var error = HttpContext?.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        IsDatabaseUnavailable = error is System.Data.Common.DbException or System.Net.Sockets.SocketException
+            || error?.InnerException is System.Data.Common.DbException or System.Net.Sockets.SocketException;
+    }
 }
